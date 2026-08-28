@@ -76,3 +76,21 @@ jobs:
           --raw-output /tmp/or_runs.csv
           --summary-output /tmp/or_summary.csv
           --comparisons-output /tmp/or_comparisons.csv
+
+      - name: CP-SAT sensitivity smoke test
+        if: matrix.python-version == '3.11'
+        run: >-
+          dmdtrl-or-sensitivity
+          --seeds 1
+          --seed-start 21000
+          --horizon 4
+          --horizon 6
+          --solver-seconds 0.05
+          --solver-seconds 0.10
+          --reference-horizon 6
+          --reference-solver-seconds 0.10
+          --bootstrap 100
+          --permutations 100
+          --raw-output /tmp/or_sensitivity_runs.csv
+          --summary-output /tmp/or_sensitivity_summary.csv
+          --comparisons-output /tmp/or_sensitivity_comparisons.csv
