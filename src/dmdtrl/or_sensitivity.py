@@ -150,7 +150,7 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
         description="Sweep CP-SAT horizon and online solve-budget configurations."
     )
     parser.add_argument("--seeds", type=int, default=20)
-    parser.add_argument("--seed-start", type=int, default=20_000)
+    parser.add_argument("--seed-start", type=int, default=10_000)
     parser.add_argument("--horizon", action="append", type=int, dest="horizons")
     parser.add_argument(
         "--solver-seconds",
