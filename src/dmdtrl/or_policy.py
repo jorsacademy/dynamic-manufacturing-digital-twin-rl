@@ -32,7 +32,7 @@ class CPSATDecision:
     job_id: int
     machine_id: int
     solver_status: str
-    objective_value: float
+    objective_value: float | None
     horizon_jobs: int
     used_fallback: bool = False
 
@@ -110,7 +110,7 @@ class RollingHorizonCPSATPolicy:
             job_id=job_id,
             machine_id=machine_id,
             solver_status=solver_status,
-            objective_value=float("nan"),
+            objective_value=None,
             horizon_jobs=len(jobs),
             used_fallback=True,
         )
