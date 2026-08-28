@@ -28,6 +28,8 @@ def test_sensitivity_grid_rejects_invalid_or_duplicate_points() -> None:
         sensitivity_grid([4], [-0.01])
     with pytest.raises(ValueError, match="duplicate"):
         sensitivity_grid([4, 4], [0.05])
+    with pytest.raises(ValueError, match="at least two"):
+        sensitivity_grid([4], [0.05])
 
 
 def test_pareto_marking_uses_quality_and_latency() -> None:
