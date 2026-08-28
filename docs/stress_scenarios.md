@@ -1,8 +1,8 @@
 # Distribution-Shift Stress Scenarios
 
-The purpose of this suite is to measure policy robustness outside nominal training-like conditions. A policy is trained or selected under nominal assumptions and then evaluated **without retraining** on controlled shifts.
+The purpose of this suite is to measure controller robustness outside nominal training-like conditions. A learned policy is trained under nominal assumptions and then evaluated **without retraining** on controlled shifts. The rolling-horizon CP-SAT controller is reoptimized online in every scenario using only information available at the current decision epoch.
 
-All policies within a scenario use the same evaluation seeds. Scenario comparisons are therefore paired at the stochastic-seed level.
+All controllers within a scenario use the same evaluation seeds. Scenario comparisons are therefore paired at the stochastic-seed level.
 
 ## Scenario definitions
 
@@ -21,21 +21,21 @@ All policies within a scenario use the same evaluation seeds. Scenario compariso
 
 Breakdown probability is capped at 0.95 so an extreme custom multiplier cannot create an invalid probability.
 
-## Interpretation
+## Controllers in the stress matrix
 
-The scenarios are controlled interventions, not claims about one specific factory. Their purpose is to create reproducible stress axes and answer questions such as:
+The stress harness supports three controller classes:
 
-- At what demand intensity does a nominally strong dispatching rule begin to fail?
-- Does an adaptive policy preserve on-time performance as disruption frequency rises?
-- Is a policy's nominal advantage explained only by setup reduction?
-- Does the learned policy remain useful when machine capacity shifts away from training conditions?
-- Under compound stress, does policy ranking change materially?
+1. the eight deterministic dispatching rules;
+2. an optional trained PPO hyper-heuristic supplied through `--model`;
+3. the rolling-horizon CP-SAT controller enabled with `--include-cpsat`.
+
+CP-SAT preserves the information boundary defined in [`or_baseline.md`](or_baseline.md): it sees released jobs and currently available machines, but not future job arrivals, breakdown realizations, or repair durations. It replans from the scenario-adjusted `EnvConfig` at every decision epoch.
 
 ## Evaluation protocol
 
-Recommended stress-test seeds begin at 30000 and must remain disjoint from training and nominal model-selection seeds.
+Recommended stress-test seeds begin at `30000` and must remain disjoint from training and nominal final-test seeds.
 
-For each scenario and policy retain raw seed-level metrics. Report at minimum:
+For each scenario and controller retain raw seed-level metrics. Report at minimum:
 
 - priority-weighted tardiness;
 - on-time completion rate;
@@ -45,15 +45,53 @@ For each scenario and policy retain raw seed-level metrics. Report at minimum:
 - utilization;
 - decision latency.
 
-For learned-policy comparisons, report paired confidence intervals, permutation p-values, effect size, probability of superiority, and percent improvement against each baseline.
+The command below evaluates fixed rules and CP-SAT on the same stress seeds:
+
+```bash
+dmdtrl-stress \
+  --include-cpsat \
+  --cpsat-horizon 12 \
+  --cpsat-solver-seconds 0.10 \
+  --seeds 50 \
+  --seed-start 30000 \
+  --raw-output results/stress_runs.csv \
+  --summary-output results/stress_summary.csv \
+  --cpsat-comparisons-output results/stress_cpsat_comparisons.csv
+```
+
+For a matched three-way study, supply the trained PPO model as well:
+
+```bash
+dmdtrl-stress \
+  --model models/ppo_dispatcher.zip \
+  --include-cpsat \
+  --seeds 100 \
+  --seed-start 30000 \
+  --comparisons-output results/stress_ppo_comparisons.csv \
+  --cpsat-comparisons-output results/stress_cpsat_comparisons.csv
+```
+
+When both optional controllers are present, PPO is compared against CP-SAT and every fixed rule. CP-SAT is independently compared against every fixed rule. Comparisons remain scenario-local and seed-paired.
+
+## Interpretation
+
+The scenarios are controlled interventions, not claims about one specific factory. They support questions such as:
+
+- At what demand intensity does a nominally strong dispatching rule begin to fail?
+- Does PPO preserve on-time performance as disruption frequency rises?
+- Does CP-SAT's additional online compute produce enough operational improvement to justify its latency?
+- Is a controller's nominal advantage explained only by setup reduction?
+- Under compound stress, does the ranking between PPO, CP-SAT, and fixed rules change materially?
+
+A single winner across all regimes is neither expected nor required. The useful scientific result is the operating region in which each controller class is preferable.
 
 ## Robustness curves
 
-The most important future visualization is not a single leaderboard. It is a response curve such as:
+The central visualization should be a response curve rather than a single leaderboard, for example:
 
-`arrival intensity -> candidate improvement over best classical baseline`
+`arrival intensity -> paired improvement over the best fixed-rule baseline`
 
-Equivalent curves should be produced for breakdown risk, due-date tightness, and other controlled stress dimensions. A useful RL policy should retain operational value across a meaningful region, rather than winning only at one calibrated point.
+Equivalent curves should be produced for breakdown risk, due-date tightness, and other controlled stress dimensions. PPO and CP-SAT should also be compared directly while reporting their decision-time difference.
 
 ## Limitations
 
