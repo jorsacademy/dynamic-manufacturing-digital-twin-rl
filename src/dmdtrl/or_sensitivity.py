@@ -4,8 +4,8 @@ import argparse
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-from dmdtrl import experiments
 from dmdtrl.env import EnvConfig
+from dmdtrl.experiments import compare_candidate_to_baselines, summarize_runs, write_csv
 from dmdtrl.or_experiments import evaluate_cpsat_policy
 from dmdtrl.or_policy import CPSATConfig, RollingHorizonCPSATPolicy
 
@@ -101,7 +101,7 @@ def evaluate_sensitivity(
                 }
             )
 
-    summaries = experiments.summarize_runs(raw_rows, n_bootstrap=n_bootstrap, seed=55_000)
+    summaries = summarize_runs(raw_rows, n_bootstrap=n_bootstrap, seed=55_000)
     summary_rows: list[dict[str, float | int | str | bool]] = []
     for row in summaries:
         label = str(row["policy"])
@@ -132,7 +132,7 @@ def compare_to_reference(
     for index, candidate in enumerate(policies):
         if candidate == reference_policy:
             continue
-        rows = experiments.compare_candidate_to_baselines(
+        rows = compare_candidate_to_baselines(
             raw_rows,
             candidate=candidate,
             baselines=[reference_policy],
@@ -213,9 +213,9 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
         n_permutations=args.permutations,
     )
 
-    experiments.write_csv(raw_rows, args.raw_output)
-    experiments.write_csv(summary_rows, args.summary_output)
-    experiments.write_csv(comparisons, args.comparisons_output)
+    write_csv(raw_rows, args.raw_output)
+    write_csv(summary_rows, args.summary_output)
+    write_csv(comparisons, args.comparisons_output)
 
     print("CP-SAT sensitivity ranking (lower WTT is better):")
     for row in sorted(summary_rows, key=lambda item: float(item["weighted_tardiness_mean"])):
