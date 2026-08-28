@@ -16,29 +16,34 @@ The `OR Validation` GitHub Actions workflow runs the full nominal sensitivity gr
 - bootstrap replicates: 2,000;
 - paired randomization permutations: 5,000.
 
-The workflow retains:
+The workflow retains raw seed-level runs, bootstrap summaries, paired comparisons against H=12 / 100 ms, and the selected operating-point JSON manifest.
 
-- raw seed-level sensitivity runs;
-- bootstrap summary table;
-- paired comparisons against the declared H=12 / 100 ms reference;
-- the selected operating-point JSON manifest.
+## Online timeout behavior
+
+A bounded online optimizer can exhaust its solve budget before finding a first feasible CP-SAT solution. `UNKNOWN` is therefore treated as an operational timeout, not as model infeasibility.
+
+On `UNKNOWN` only, the controller executes a deterministic one-step feasible fallback assignment based on immediate weighted tardiness, tardiness, setup, completion time, due date, priority, machine ID, and job ID. `INFEASIBLE` and model errors remain hard failures.
+
+Every episode reports:
+
+- fallback decision count;
+- total decision count;
+- solver fallback rate;
+- solver success rate.
+
+This makes short compute budgets measurable rather than silently crashing or being mislabeled as successful CP-SAT operation.
 
 ## Selection rule
 
-The selector first restricts attention to Pareto-optimal configurations in mean priority-weighted tardiness and measured mean online decision latency.
+The selector first restricts attention to configurations that are Pareto-optimal in mean priority-weighted tardiness and measured mean online decision latency. It then requires the mean solver fallback rate to be at most the predeclared default of 1%.
 
-Let `WTT_best` be the lowest mean weighted tardiness on the validation Pareto set. With the predeclared default tolerance of 2%, a Pareto configuration is quality-acceptable when:
+Let `WTT_best` be the lowest mean weighted tardiness among those reliable Pareto points. With the default 2% quality tolerance, a configuration is quality-acceptable when:
 
 `WTT <= WTT_best × 1.02`
 
-Among those acceptable configurations, select the one with the lowest measured mean decision latency. Remaining ties are broken deterministically by:
+Among acceptable reliable configurations, choose the one with the lowest measured mean decision latency. Remaining ties are broken by lower WTT, lower fallback rate, lower solver budget, smaller horizon, then policy identifier.
 
-1. lower weighted tardiness;
-2. lower solver budget;
-3. smaller horizon;
-4. policy identifier.
-
-This rule deliberately does not choose the lowest observed WTT at any compute cost. It selects a low-latency operating point whose validation quality is practically indistinguishable under the declared tolerance.
+This prevents a very small compute budget that mostly behaves as a heuristic fallback from being selected and described as the CP-SAT operating point.
 
 ## Data-integrity checks
 
@@ -48,26 +53,18 @@ This rule deliberately does not choose the lowest observed WTT at any compute co
 - every seed is at least 10000 and strictly below 20000;
 - at least two sensitivity configurations are present;
 - every configuration contains the complete declared validation seed set;
-- every summary row contains the required sensitivity fields;
+- required sensitivity and solver-reliability fields are present;
 - operational numeric values are finite and valid;
-- at least one Pareto-optimal configuration is present.
+- at least one Pareto-optimal configuration exists;
+- at least one Pareto configuration satisfies the declared fallback-rate limit.
 
-These checks prevent partial grid runs or final-test leakage from silently determining the OR configuration.
+These checks prevent partial grid runs, final-test leakage, and solver-timeout masking from silently determining the OR configuration.
 
 ## Freeze manifest
 
-The generated JSON records:
+The generated JSON records selected horizon and solver budget, validation WTT and latency, solver fallback rate, reliability limit, quality tolerance and threshold, Pareto candidate counts, validation seed range, source files, Git commit SHA when available, and the exact textual selection rule.
 
-- selected horizon and solver budget;
-- validation WTT and latency;
-- quality tolerance and threshold;
-- Pareto and acceptable-candidate counts;
-- validation seed range;
-- raw and summary source files;
-- Git commit SHA when running in GitHub Actions;
-- the exact textual selection rule.
-
-After the validation campaign is reviewed, the selected horizon/budget should be frozen and reused unchanged for nominal final-test and stress-test experiments.
+After review, the selected horizon/budget is frozen and reused unchanged for nominal final-test and stress-test experiments.
 
 ## Scientific boundary
 
