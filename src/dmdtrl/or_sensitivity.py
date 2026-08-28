@@ -5,13 +5,23 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from dmdtrl.env import EnvConfig
-from dmdtrl.experiments import compare_candidate_to_baselines, summarize_runs, write_csv
+from dmdtrl.experiments import (
+    METRIC_DIRECTIONS,
+    compare_candidate_to_baselines,
+    summarize_runs,
+    write_csv,
+)
 from dmdtrl.or_experiments import evaluate_cpsat_policy
 from dmdtrl.or_policy import CPSATConfig, RollingHorizonCPSATPolicy
 
 DEFAULT_HORIZONS = (4, 8, 12)
 DEFAULT_SOLVER_BUDGETS = (0.02, 0.05, 0.10)
 SENSITIVITY_METRICS = ("weighted_tardiness", "mean_decision_time_ms")
+SENSITIVITY_SUMMARY_METRICS = (
+    *METRIC_DIRECTIONS,
+    "solver_fallback_rate",
+    "solver_success_rate",
+)
 
 
 def variant_name(horizon: int, solver_seconds: float) -> str:
@@ -100,7 +110,12 @@ def evaluate_sensitivity(
                 }
             )
 
-    summaries = summarize_runs(raw_rows, n_bootstrap=n_bootstrap, seed=55_000)
+    summaries = summarize_runs(
+        raw_rows,
+        metrics=SENSITIVITY_SUMMARY_METRICS,
+        n_bootstrap=n_bootstrap,
+        seed=55_000,
+    )
     summary_rows: list[dict[str, float | int | str | bool]] = []
     for row in summaries:
         label = str(row["policy"])
@@ -222,7 +237,8 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
         print(
             f"  {str(row['policy']):<28} "
             f"WTT={float(row['weighted_tardiness_mean']):.3f} "
-            f"decision={float(row['mean_decision_time_ms_mean']):.3f} ms {marker}"
+            f"decision={float(row['mean_decision_time_ms_mean']):.3f} ms "
+            f"fallback={100.0 * float(row['solver_fallback_rate_mean']):.2f}% {marker}"
         )
 
     print(f"Sensitivity runs saved to {args.raw_output}")
