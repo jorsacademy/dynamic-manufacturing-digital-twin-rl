@@ -39,6 +39,8 @@ def sensitivity_grid(
     names = [variant_name(horizon, budget) for horizon, budget in grid]
     if len(set(names)) != len(names):
         raise ValueError("sensitivity grid contains duplicate configurations")
+    if len(grid) < 2:
+        raise ValueError("sensitivity grid must contain at least two configurations")
     return grid
 
 
@@ -185,7 +187,7 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
     horizons = tuple(args.horizons or DEFAULT_HORIZONS)
     budgets = tuple(args.solver_budgets or DEFAULT_SOLVER_BUDGETS)
     try:
-        sensitivity_grid(horizons, budgets)
+        grid = sensitivity_grid(horizons, budgets)
         reference_policy = variant_name(
             args.reference_horizon,
             args.reference_solver_seconds,
@@ -193,7 +195,7 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
     except ValueError as exc:
         parser.error(str(exc))
 
-    grid_names = {variant_name(horizon, budget) for horizon, budget in sensitivity_grid(horizons, budgets)}
+    grid_names = {variant_name(horizon, budget) for horizon, budget in grid}
     if reference_policy not in grid_names:
         parser.error("reference configuration must be included in the sensitivity grid")
 
