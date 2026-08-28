@@ -9,7 +9,6 @@ from dmdtrl.experiments import compare_candidate_to_baselines, summarize_runs, w
 from dmdtrl.or_experiments import evaluate_cpsat_policy
 from dmdtrl.or_policy import CPSATConfig, RollingHorizonCPSATPolicy
 
-
 DEFAULT_HORIZONS = (4, 8, 12)
 DEFAULT_SOLVER_BUDGETS = (0.02, 0.05, 0.10)
 SENSITIVITY_METRICS = ("weighted_tardiness", "mean_decision_time_ms")
