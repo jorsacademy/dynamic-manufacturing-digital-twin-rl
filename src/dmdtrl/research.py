@@ -3,11 +3,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from dmdtrl import experiments
-from dmdtrl.dispatch import DispatchRule
-from dmdtrl.env import EnvConfig
-from dmdtrl.policies import FixedActionPolicy, load_ppo_policy
-
 
 DEFAULT_COMPARISON_METRICS = (
     "weighted_tardiness",
@@ -20,11 +15,19 @@ DEFAULT_COMPARISON_METRICS = (
 )
 
 
-def fixed_policies() -> list[FixedActionPolicy]:
+def fixed_policies():
+    from dmdtrl.dispatch import DispatchRule
+    from dmdtrl.policies import FixedActionPolicy
+
     return [FixedActionPolicy(int(rule), rule.name) for rule in DispatchRule]
 
 
 def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
+    from dmdtrl import experiments
+    from dmdtrl.dispatch import DispatchRule
+    from dmdtrl.env import EnvConfig
+    from dmdtrl.policies import load_ppo_policy
+
     parser = argparse.ArgumentParser(
         description="Run seed-level scheduling experiments with statistical comparisons."
     )
