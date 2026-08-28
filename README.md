@@ -4,13 +4,15 @@ A research-oriented industrial engineering / operations research project for **d
 
 The repository implements an event-driven manufacturing digital twin and formulates real-time dispatching as a reinforcement-learning hyper-heuristic. Instead of assigning an RL action to every `(job, machine)` pair, the agent selects a dispatching policy at each decision epoch. This keeps the action space fixed while allowing the policy to adapt to stochastic arrivals, heterogeneous machines, sequence-dependent setups, due-date pressure, and random breakdowns.
 
+> Current model scope: dynamic heterogeneous parallel-machine scheduling. It is not yet a full job-shop or flexible job-shop model; multi-operation routing and precedence constraints are a later research phase.
+
 ## Research question
 
-> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic outperform fixed dispatching rules and, in later phases, rolling-horizon OR methods?
+> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and, later, rolling-horizon OR methods?
 
-The project is intentionally structured around **benchmarking**, not training reward alone.
+The project is intentionally structured around **benchmarking and statistical validation**, not training reward alone.
 
-## Current v0.1 scope
+## Current v0.2 scope
 
 The digital twin includes:
 
@@ -23,8 +25,13 @@ The digital twin includes:
 - event-driven scheduling decisions;
 - fourteen bounded operational state features;
 - eight deterministic dispatching rules;
-- PPO training entry point;
-- common-random-number baseline experiments;
+- PPO training and deterministic model-evaluation adapters;
+- common-random-number experiments;
+- raw seed-level KPI output;
+- bootstrap confidence intervals;
+- paired randomization tests;
+- paired effect sizes and probability of superiority;
+- online decision-latency measurement;
 - automated unit tests and GitHub Actions CI.
 
 ## RL formulation
@@ -75,9 +82,11 @@ The incremental reward combines:
 - breakdown/repair penalty;
 - quality-risk penalty.
 
+Reward is a training mechanism. Scientific conclusions are based on operational KPIs.
+
 ## OR / IE performance metrics
 
-Experiments report operational KPIs independently from the RL reward:
+Experiments report:
 
 - makespan;
 - mean waiting time;
@@ -87,19 +96,20 @@ Experiments report operational KPIs independently from the RL reward:
 - repair/disruption time;
 - on-time completion rate;
 - machine utilization;
-- mean processed quality risk.
+- mean processed quality risk;
+- mean online decision latency.
 
 ## Installation
 
-Core simulation and baselines:
+Core simulation and research harness:
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev,analysis]"
 ```
 
-For PPO training:
+For PPO training/evaluation:
 
 ```bash
 pip install -e ".[rl,dev,analysis]"
@@ -114,11 +124,46 @@ ruff check src tests
 
 ## Benchmark fixed dispatching rules
 
+The original compact baseline command remains available:
+
 ```bash
 dmdtrl-baselines --seeds 30 --output results/baselines.csv
 ```
 
-All policies are evaluated with the same random seeds so that they face comparable synthetic job streams and disruptions.
+## Research-grade experiment harness
+
+Run all eight fixed policies on common random seeds and retain seed-level results plus bootstrap confidence intervals:
+
+```bash
+dmdtrl-research \
+  --seeds 50 \
+  --raw-output results/research_runs.csv \
+  --summary-output results/research_summary.csv
+```
+
+After training PPO, run paired PPO-vs-baseline comparisons on the same stochastic scenarios:
+
+```bash
+dmdtrl-research \
+  --model models/ppo_dispatcher.zip \
+  --seeds 100 \
+  --raw-output results/research_runs.csv \
+  --summary-output results/research_summary.csv \
+  --comparisons-output results/ppo_comparisons.csv
+```
+
+For every candidate-vs-baseline KPI comparison, the harness reports:
+
+- candidate and baseline means;
+- paired mean improvement, oriented so positive favors the candidate;
+- bootstrap 95% confidence interval;
+- percent improvement relative to the baseline mean;
+- two-sided paired randomization p-value;
+- Cohen's dz paired effect size;
+- probability of superiority;
+- number of paired stochastic seeds.
+
+All policies are evaluated with the same random seeds so they face comparable synthetic job streams and disruptions.
 
 ## Train PPO
 
@@ -133,27 +178,34 @@ The trained Stable-Baselines3 model is saved as `models/ppo_dispatcher.zip`.
 ```text
 .
 ├── .github/workflows/ci.yml
+├── docs/
+│   ├── research_protocol.md
+│   └── roadmap.md
 ├── src/dmdtrl/
 │   ├── dispatch.py
 │   ├── env.py
 │   ├── evaluate.py
+│   ├── experiments.py
 │   ├── generator.py
 │   ├── models.py
+│   ├── policies.py
+│   ├── research.py
+│   ├── statistics.py
 │   └── train.py
 ├── tests/
 ├── pyproject.toml
 └── README.md
 ```
 
-## Planned research phases
+## Research phases
 
-### Phase 1 — validated simulation + deterministic OR baselines
+### Phase 1 — validated simulation + deterministic baselines
 
-Current phase. Validate event logic and establish reproducible KPI baselines.
+Complete. Event logic, dispatching rules, reproducibility tests, and baseline benchmarking are implemented.
 
-### Phase 2 — PPO hyper-heuristic benchmark
+### Phase 2 — PPO hyper-heuristic + statistical validation
 
-Train PPO and evaluate it out-of-sample against every fixed dispatching rule with confidence intervals and paired statistical tests.
+Current phase. Evaluate PPO out-of-sample against every fixed dispatching rule using paired stochastic seeds, confidence intervals, effect sizes, and decision latency.
 
 ### Phase 3 — rolling-horizon optimization
 
@@ -163,23 +215,29 @@ Add CP-SAT / MILP scheduling baselines and compare solution quality, compute tim
 
 Train under nominal conditions and test under distribution shifts:
 
-- +20% / +40% arrival intensity;
+- +20% / +40% / +60% arrival intensity;
 - elevated breakdown probability;
 - unseen machine-speed profiles;
 - changed job-family mix;
-- tighter due dates.
+- setup-heavy mixes;
+- tighter due dates;
+- urgent-order bursts.
 
-### Phase 5 — graph representation
+The key scientific output will be the relationship between uncertainty/disruption level and the relative advantage of adaptive policies.
 
-Represent the shop floor and waiting jobs as a graph and study GNN-based state encoding or action-masked direct scheduling.
+### Phase 5 — true flexible job-shop extension
+
+Introduce multi-operation jobs, precedence constraints, alternative eligible machines, routing decisions, and variable feasible action sets. Candidate methods include action-masked PPO and graph-based state representations.
 
 ### Phase 6 — live decision-twin layer
 
-Expose current twin state and recommended actions through an API/dashboard suitable for connection to simulated or real production data.
+Expose current twin state and recommended actions through an API/dashboard suitable for simulated or real production data.
 
-## Scientific use
+## Scientific protocol
 
-For credible RL-vs-OR comparisons, future experiments should report multiple random seeds, confidence intervals, out-of-distribution tests, wall-clock decision time, and explicit baseline tuning. A learned policy should not be judged only by cumulative training reward.
+See [`docs/research_protocol.md`](docs/research_protocol.md) for predeclared evaluation standards and [`docs/roadmap.md`](docs/roadmap.md) for the phased research plan.
+
+A learned policy should not be described as superior merely because training reward increases. If a classical OR or dispatching policy is faster, more robust, or operationally better, that is a valid and useful research result.
 
 ## License
 
