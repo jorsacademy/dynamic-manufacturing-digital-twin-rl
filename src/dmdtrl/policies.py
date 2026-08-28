@@ -43,15 +43,10 @@ class PredictPolicyAdapter:
         return int(np.asarray(action).item())
 
 
-def load_ppo_policy(
-    model_path: str | Path,
-    *,
-    deterministic: bool = True,
-    policy_name: str = "PPO",
-) -> PredictPolicyAdapter:
+def load_ppo_policy(model_path: str | Path, *, deterministic: bool = True) -> PredictPolicyAdapter:
     try:
         from stable_baselines3 import PPO
     except ImportError as exc:  # pragma: no cover - optional dependency
         raise RuntimeError('Install RL dependencies with: pip install -e ".[rl]"') from exc
     model = PPO.load(str(model_path))
-    return PredictPolicyAdapter(model=model, policy_name=policy_name, deterministic=deterministic)
+    return PredictPolicyAdapter(model=model, policy_name="PPO", deterministic=deterministic)
