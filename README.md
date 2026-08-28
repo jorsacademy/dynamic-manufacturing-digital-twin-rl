@@ -10,37 +10,33 @@ The repository implements an event-driven manufacturing digital twin and compare
 
 > Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and rolling-horizon optimization, after accounting for online decision latency?
 
-The project is structured around **benchmarking, stress testing, reproducible training, OR comparison, and paired statistical validation**, not training reward alone.
+The project is structured around **benchmarking, stress testing, reproducible training, OR comparison, compute-budget sensitivity, and paired statistical validation**, not training reward alone.
 
-## Current v0.6 scope
+## Current v0.7 scope
 
 The digital twin and research harness include:
 
 - stochastic job arrivals and heterogeneous parallel machines;
-- sequence-dependent family changeovers;
-- random machine breakdown/repair delays;
+- sequence-dependent family changeovers and random breakdown/repair delays;
 - priorities, due dates, and quality-risk attributes;
-- fourteen bounded operational state features;
-- eight deterministic dispatching rules;
-- reproducible PPO hyper-heuristic training with audit manifests;
+- fourteen bounded operational state features and eight deterministic dispatching rules;
+- reproducible PPO training with audit manifests;
 - rolling-horizon CP-SAT with explicit job-machine decisions;
 - released-job-only OR information boundaries;
 - machine-dependent processing times and sequence-dependent setup transitions in CP-SAT;
 - strictly primary priority-weighted tardiness optimization;
-- nominal final-test seeds separated at `20000+`;
-- distribution-shift seeds separated at `30000+`;
+- nominal final-test seeds separated at `20000+` and stress seeds at `30000+`;
 - matched PPO / CP-SAT / fixed-rule stress evaluation;
+- CP-SAT horizon × solver-budget sensitivity analysis;
+- WTT/decision-latency Pareto-front identification;
 - seed-level KPI output, bootstrap confidence intervals, paired randomization tests, effect sizes, and probability of superiority;
-- online decision-latency measurement;
 - Python 3.10/3.11/3.12 CI and a separate real Stable-Baselines3 integration workflow.
 
 ## Controller formulations
 
 ### PPO hyper-heuristic
 
-The PPO agent receives a 14-dimensional normalized operational state and selects one of eight dispatching rules: FIFO, highest priority, EDD, SPT, same-family-first, minimum setup, critical ratio, or a weighted composite heuristic.
-
-This fixed action space avoids direct variable job-ID actions. Reward is used only for training; scientific conclusions use operational KPIs.
+The PPO agent receives a 14-dimensional normalized operational state and selects one of eight dispatching rules: FIFO, highest priority, EDD, SPT, same-family-first, minimum setup, critical ratio, or a weighted composite heuristic. Reward is used for training; scientific conclusions use operational KPIs.
 
 ### Rolling-horizon CP-SAT
 
@@ -60,18 +56,6 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[dev,analysis]"
 ```
 
-For PPO:
-
-```bash
-pip install -e ".[rl,dev,analysis]"
-```
-
-For CP-SAT:
-
-```bash
-pip install -e ".[or,dev,analysis]"
-```
-
 For the complete comparative stack:
 
 ```bash
@@ -85,12 +69,6 @@ pytest
 ruff check src tests
 ```
 
-## Fixed-rule benchmark
-
-```bash
-dmdtrl-baselines --seeds 30 --output results/baselines.csv
-```
-
 ## Train PPO with an audit manifest
 
 ```bash
@@ -102,7 +80,7 @@ dmdtrl-train \
   --device cpu
 ```
 
-The JSON manifest records the full PPO configuration, `EnvConfig`, training time, runtime/package versions, and GitHub run metadata when available. See [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md).
+See [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md).
 
 ## Nominal PPO evaluation
 
@@ -129,25 +107,36 @@ dmdtrl-or \
   --comparisons-output results/cpsat_comparisons.csv
 ```
 
-See [`docs/or_baseline.md`](docs/or_baseline.md) for the OR information boundary and formulation.
+See [`docs/or_baseline.md`](docs/or_baseline.md).
+
+## CP-SAT sensitivity study
+
+The OR operating point is treated as an experimental design choice rather than a fixed magic constant. Sweep horizon length and online solve budget on common validation seeds:
+
+```bash
+dmdtrl-or-sensitivity \
+  --seeds 30 \
+  --seed-start 20000 \
+  --horizon 4 \
+  --horizon 8 \
+  --horizon 12 \
+  --solver-seconds 0.02 \
+  --solver-seconds 0.05 \
+  --solver-seconds 0.10 \
+  --reference-horizon 12 \
+  --reference-solver-seconds 0.10 \
+  --raw-output results/cpsat_sensitivity_runs.csv \
+  --summary-output results/cpsat_sensitivity_summary.csv \
+  --comparisons-output results/cpsat_sensitivity_comparisons.csv
+```
+
+The summary flags configurations that are non-dominated in mean weighted tardiness and actual mean online decision latency. Every other grid point is also compared to the declared reference using paired WTT and latency statistics. See [`docs/or_sensitivity.md`](docs/or_sensitivity.md).
+
+The sensitivity seed set should be treated as validation data. Select and freeze the practical CP-SAT operating point before analyzing final test seeds.
 
 ## Matched distribution-shift evaluation
 
 Built-in scenarios include nominal conditions, +20/+40/+60% arrival intensity, 2x/4x breakdown probability, tighter due dates, slower machines, 2x setup duration, and compound stress.
-
-Fixed rules plus CP-SAT:
-
-```bash
-dmdtrl-stress \
-  --include-cpsat \
-  --cpsat-horizon 12 \
-  --cpsat-solver-seconds 0.10 \
-  --seeds 50 \
-  --seed-start 30000 \
-  --raw-output results/stress_runs.csv \
-  --summary-output results/stress_summary.csv \
-  --cpsat-comparisons-output results/stress_cpsat_comparisons.csv
-```
 
 Full PPO / CP-SAT / fixed-rule matrix:
 
@@ -169,11 +158,11 @@ When both optional controllers are present, PPO is compared against CP-SAT and a
 
 ## Statistical outputs
 
-For candidate-vs-baseline KPI comparisons the harness reports candidate and baseline means, paired mean improvement, bootstrap 95% confidence interval, percent improvement, two-sided paired randomization p-value, Cohen's dz effect size, probability of superiority, and number of paired stochastic seeds.
+Candidate-vs-baseline comparisons report means, paired mean improvement, bootstrap 95% confidence interval, percent improvement, two-sided paired randomization p-value, Cohen's dz effect size, probability of superiority, and paired seed count.
 
 ## GitHub Actions
 
-- `CI`: Python 3.10/3.11/3.12 lint, tests, coverage, nominal research smoke, CP-SAT nominal smoke, and distribution-shift smoke with actual OR-Tools solves.
+- `CI`: Python 3.10/3.11/3.12 lint, tests, coverage, nominal research smoke, CP-SAT nominal/stress smoke, and a multi-point CP-SAT sensitivity smoke grid.
 - `RL Smoke`: Python 3.11 with Stable-Baselines3/PyTorch, short PPO training, nominal/stress inference, manifest validation, and uploaded experiment artifacts.
 
 The short PPO model generated by `RL Smoke` is an integration test only and must not be interpreted as policy-quality evidence.
@@ -182,8 +171,8 @@ The short PPO model generated by `RL Smoke` is an integration test only and must
 
 1. **Validated simulation + deterministic baselines:** complete.
 2. **PPO hyper-heuristic + statistical infrastructure:** complete; long-horizon multi-training-seed experiment pending.
-3. **Rolling-horizon OR benchmark:** nominal and stress integration implemented; horizon/solver-budget sensitivity is next.
-4. **Generalization study:** stress infrastructure implemented; full comparative campaign pending.
+3. **Rolling-horizon OR benchmark:** controller, stress integration, and sensitivity harness implemented; larger validation sweep and operating-point freeze are next.
+4. **Generalization/full comparative study:** infrastructure implemented; full campaign pending.
 5. **True flexible job-shop extension:** planned.
 6. **Decision-twin service layer:** planned.
 
