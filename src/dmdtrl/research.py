@@ -3,14 +3,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import dmdtrl.experiments as experiment_tools
 from dmdtrl.dispatch import DispatchRule
 from dmdtrl.env import EnvConfig
-from dmdtrl.experiments import (
-    compare_candidate_to_baselines,
-    evaluate_policies,
-    summarize_runs,
-    write_csv,
-)
 from dmdtrl.policies import DispatchPolicy, FixedActionPolicy, load_ppo_policy
 
 
@@ -50,10 +45,10 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
     if args.model is not None:
         policies.append(load_ppo_policy(args.model))
 
-    rows = evaluate_policies(policies, range(args.seeds), EnvConfig())
-    summaries = summarize_runs(rows, n_bootstrap=args.bootstrap)
-    write_csv(rows, args.raw_output)
-    write_csv(summaries, args.summary_output)
+    rows = experiment_tools.evaluate_policies(policies, range(args.seeds), EnvConfig())
+    summaries = experiment_tools.summarize_runs(rows, n_bootstrap=args.bootstrap)
+    experiment_tools.write_csv(rows, args.raw_output)
+    experiment_tools.write_csv(summaries, args.summary_output)
 
     print("Weighted-tardiness ranking (lower is better):")
     for row in sorted(summaries, key=lambda item: float(item["weighted_tardiness_mean"])):
@@ -66,7 +61,7 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
 
     if args.model is not None:
         baselines = [rule.name for rule in DispatchRule]
-        comparisons = compare_candidate_to_baselines(
+        comparisons = experiment_tools.compare_candidate_to_baselines(
             rows,
             candidate="PPO",
             baselines=baselines,
@@ -74,7 +69,7 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
             n_bootstrap=args.bootstrap,
             n_permutations=args.permutations,
         )
-        write_csv(comparisons, args.comparisons_output)
+        experiment_tools.write_csv(comparisons, args.comparisons_output)
         print(f"Paired PPO comparisons saved to {args.comparisons_output}")
 
     print(f"Seed-level runs saved to {args.raw_output}")
