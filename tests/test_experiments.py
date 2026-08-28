@@ -1,3 +1,5 @@
+import csv
+
 import numpy as np
 import pytest
 
@@ -6,6 +8,7 @@ from dmdtrl.experiments import (
     evaluate_policies,
     paired_comparison,
     summarize_runs,
+    write_csv,
 )
 from dmdtrl.policies import FixedActionPolicy
 
@@ -89,3 +92,24 @@ def test_compare_candidate_to_baselines_handles_max_metric():
     assert len(results) == 1
     assert results[0]["direction"] == "max"
     assert results[0]["mean_improvement"] > 0.0
+
+
+def test_write_csv_supports_heterogeneous_controller_fields(tmp_path):
+    output = tmp_path / "mixed.csv"
+    rows = [
+        {"policy": "fixed", "seed": 1, "weighted_tardiness": 10.0},
+        {
+            "policy": "CP_SAT_RH",
+            "seed": 1,
+            "weighted_tardiness": 9.0,
+            "solver_fallback_rate": 0.0,
+        },
+    ]
+
+    write_csv(rows, output)
+
+    with output.open(newline="", encoding="utf-8") as handle:
+        written = list(csv.DictReader(handle))
+    assert "solver_fallback_rate" in written[0]
+    assert written[0]["solver_fallback_rate"] == ""
+    assert written[1]["solver_fallback_rate"] == "0.0"
