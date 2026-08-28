@@ -54,10 +54,14 @@ jobs:
           --seed-start 30000
           --scenario nominal
           --scenario demand_140
+          --include-cpsat
+          --cpsat-horizon 6
+          --cpsat-solver-seconds 0.10
           --bootstrap 100
           --permutations 100
           --raw-output /tmp/stress_runs.csv
           --summary-output /tmp/stress_summary.csv
+          --cpsat-comparisons-output /tmp/stress_cpsat_comparisons.csv
 
       - name: Rolling-horizon CP-SAT smoke test
         if: matrix.python-version == '3.11'
