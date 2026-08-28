@@ -8,6 +8,7 @@ from dmdtrl.models import Job
 
 if TYPE_CHECKING:
     from dmdtrl.env import DynamicManufacturingEnv
+    from dmdtrl.models import Machine
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +34,7 @@ class CPSATDecision:
     solver_status: str
     objective_value: float
     horizon_jobs: int
+    used_fallback: bool = False
 
 
 def select_horizon(
@@ -56,12 +58,62 @@ class RollingHorizonCPSATPolicy:
     The optimizer does not inspect future unreleased arrivals or future breakdown
     realizations. At every decision epoch it plans a bounded subset of the current
     queue, executes only the first job-machine assignment, then replans.
+
+    If the declared online time budget expires before CP-SAT finds its first feasible
+    solution, the controller executes a deterministic one-step emergency assignment.
+    This preserves operational feasibility while exposing the event through
+    ``used_fallback`` so compute-budget sensitivity can measure solver reliability.
     """
 
     name = "CP_SAT_RH"
 
     def __init__(self, config: CPSATConfig | None = None):
         self.config = config or CPSATConfig()
+
+    def _fallback_decision(
+        self,
+        env: DynamicManufacturingEnv,
+        jobs: tuple[Job, ...],
+        machines: tuple[Machine, ...],
+        solver_status: str,
+    ) -> CPSATDecision:
+        """Return a deterministic feasible assignment after an online solver timeout."""
+        candidates: list[tuple[float, float, float, float, float, int, int, int]] = []
+        for machine in machines:
+            for job in jobs:
+                setup = (
+                    0.0
+                    if machine.last_family in (None, job.family)
+                    else env.config.sequence_setup_time
+                )
+                processing = job.processing_time / machine.speed
+                completion = env.current_time + setup + processing
+                tardiness = max(completion - job.due_date, 0.0)
+                candidates.append(
+                    (
+                        job.priority * tardiness,
+                        tardiness,
+                        setup,
+                        completion,
+                        job.due_date,
+                        -job.priority,
+                        machine.machine_id,
+                        job.job_id,
+                    )
+                )
+
+        if not candidates:  # pragma: no cover - guarded by choose
+            raise RuntimeError("fallback requires at least one job-machine candidate")
+
+        *_, machine_id, job_id = min(candidates)
+        return CPSATDecision(
+            job_id=job_id,
+            machine_id=machine_id,
+            solver_status=solver_status,
+            objective_value=float("nan"),
+            horizon_jobs=len(jobs),
+            used_fallback=True,
+        )
 
     def choose(self, env: DynamicManufacturingEnv) -> CPSATDecision:
         jobs = select_horizon(env.queued_jobs(), max_jobs=self.config.max_jobs)
@@ -182,6 +234,13 @@ class RollingHorizonCPSATPolicy:
         solver.parameters.random_seed = self.config.random_seed
 
         status = solver.Solve(model)
+        if status == cp_model.UNKNOWN:
+            return self._fallback_decision(
+                env,
+                jobs,
+                machines,
+                solver.StatusName(status),
+            )
         if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             raise RuntimeError(f"CP-SAT did not produce a feasible plan: {solver.StatusName(status)}")
 
