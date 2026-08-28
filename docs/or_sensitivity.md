@@ -20,12 +20,23 @@ The default reference configuration is horizon 12 with a 100 ms solver budget.
 
 Every grid point is evaluated on exactly the same stochastic seeds. OR-Tools uses one search worker and a fixed solver random seed, consistent with the main CP-SAT benchmark.
 
+## Seed regime
+
+Sensitivity analysis is a model-selection activity, so it uses the reserved **validation** range rather than final-test seeds. The repository convention is:
+
+- training: `0-9999`;
+- validation/model selection: `10000-10049`;
+- nominal final test: `20000-20099`;
+- distribution-shift final test: `30000-30099` per scenario family.
+
+The sensitivity harness therefore defaults to `10000+`. Final nominal seeds must remain untouched until the CP-SAT operating point is frozen.
+
 ## Command
 
 ```bash
 dmdtrl-or-sensitivity \
   --seeds 30 \
-  --seed-start 20000 \
+  --seed-start 10000 \
   --horizon 4 \
   --horizon 8 \
   --horizon 12 \
@@ -69,7 +80,7 @@ The sensitivity study is not a hyperparameter-tuning shortcut that selects the l
 3. identify non-dominated operating points for later PPO-vs-CP-SAT comparisons;
 4. predeclare a practical CP-SAT configuration before the large final stress campaign.
 
-A configuration should be selected using a development/validation seed set and then frozen before final evaluation seeds are analyzed.
+A configuration should be selected using the validation seed set and then frozen before final evaluation seeds are analyzed.
 
 ## Next step
 
