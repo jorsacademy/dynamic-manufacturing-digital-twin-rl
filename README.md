@@ -10,9 +10,9 @@ The repository implements an event-driven manufacturing digital twin and compare
 
 > Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and rolling-horizon optimization, after accounting for online decision latency?
 
-The project is structured around **benchmarking, stress testing, reproducible training, OR comparison, compute-budget sensitivity, and paired statistical validation**, not training reward alone.
+The project is structured around **benchmarking, stress testing, reproducible training, OR comparison, compute-budget sensitivity, model-selection discipline, and paired statistical validation**, not training reward alone.
 
-## Current v0.7 scope
+## Current v0.8 scope
 
 The digital twin and research harness include:
 
@@ -29,6 +29,9 @@ The digital twin and research harness include:
 - matched PPO / CP-SAT / fixed-rule stress evaluation;
 - CP-SAT horizon × solver-budget sensitivity analysis;
 - WTT/decision-latency Pareto-front identification;
+- deterministic validation-only CP-SAT operating-point selection;
+- complete-grid validation checks that require every configuration to contain the same declared seed set;
+- dedicated 30-seed OR Validation workflow with uploaded selection artifacts;
 - seed-level KPI output, bootstrap confidence intervals, paired randomization tests, effect sizes, and probability of superiority;
 - Python 3.10/3.11/3.12 CI and a separate real Stable-Baselines3 integration workflow.
 
@@ -96,12 +99,14 @@ dmdtrl-research \
 
 ## Nominal CP-SAT benchmark
 
+The nominal final-test command is used only after the CP-SAT operating point is frozen:
+
 ```bash
 dmdtrl-or \
-  --seeds 30 \
+  --seeds 100 \
   --seed-start 20000 \
-  --horizon 12 \
-  --solver-seconds 0.10 \
+  --horizon <FROZEN_HORIZON> \
+  --solver-seconds <FROZEN_SOLVER_SECONDS> \
   --raw-output results/or_runs.csv \
   --summary-output results/or_summary.csv \
   --comparisons-output results/cpsat_comparisons.csv
@@ -125,27 +130,41 @@ dmdtrl-or-sensitivity \
   --solver-seconds 0.10 \
   --reference-horizon 12 \
   --reference-solver-seconds 0.10 \
-  --raw-output results/cpsat_sensitivity_runs.csv \
-  --summary-output results/cpsat_sensitivity_summary.csv \
-  --comparisons-output results/cpsat_sensitivity_comparisons.csv
+  --raw-output results/cpsat_validation_runs.csv \
+  --summary-output results/cpsat_validation_summary.csv \
+  --comparisons-output results/cpsat_validation_comparisons.csv
 ```
 
-The summary flags configurations that are non-dominated in mean weighted tardiness and actual mean online decision latency. Every other grid point is also compared to the declared reference using paired WTT and latency statistics. See [`docs/or_sensitivity.md`](docs/or_sensitivity.md).
+The summary flags configurations that are non-dominated in mean weighted tardiness and actual mean online decision latency. See [`docs/or_sensitivity.md`](docs/or_sensitivity.md).
 
-The sensitivity seed set is model-selection data. Select and freeze the practical CP-SAT operating point before analyzing nominal final-test seeds in the `20000+` range.
+## Select and freeze the CP-SAT operating point
+
+The predeclared default rule keeps only Pareto configurations within 2% of the best validation weighted tardiness and selects the one with the lowest measured mean decision latency.
+
+```bash
+dmdtrl-or-select \
+  --raw-input results/cpsat_validation_runs.csv \
+  --summary-input results/cpsat_validation_summary.csv \
+  --output results/cpsat_operating_point.json \
+  --quality-tolerance-pct 2.0 \
+  --validation-seed-start 10000 \
+  --validation-seeds 30
+```
+
+The selector refuses partial or leaked seed sets. Every CP-SAT configuration must contain all declared validation seeds, and the range must remain below final-test seed 20000. See [`docs/or_operating_point.md`](docs/or_operating_point.md).
 
 ## Matched distribution-shift evaluation
 
 Built-in scenarios include nominal conditions, +20/+40/+60% arrival intensity, 2x/4x breakdown probability, tighter due dates, slower machines, 2x setup duration, and compound stress.
 
-Full PPO / CP-SAT / fixed-rule matrix:
+After both PPO and CP-SAT settings are frozen, run the full matrix on disjoint stress seeds:
 
 ```bash
 dmdtrl-stress \
   --model models/ppo_dispatcher.zip \
   --include-cpsat \
-  --cpsat-horizon 12 \
-  --cpsat-solver-seconds 0.10 \
+  --cpsat-horizon <FROZEN_HORIZON> \
+  --cpsat-solver-seconds <FROZEN_SOLVER_SECONDS> \
   --seeds 100 \
   --seed-start 30000 \
   --raw-output results/stress_runs.csv \
@@ -164,14 +183,15 @@ Candidate-vs-baseline comparisons report means, paired mean improvement, bootstr
 
 - `CI`: Python 3.10/3.11/3.12 lint, tests, coverage, nominal research smoke, CP-SAT nominal/stress smoke, and a multi-point CP-SAT sensitivity smoke grid on validation seeds.
 - `RL Smoke`: Python 3.11 with Stable-Baselines3/PyTorch, short PPO training, nominal/stress inference, manifest validation, and uploaded experiment artifacts.
+- `OR Validation`: 30-seed validation-only 3×3 CP-SAT sensitivity campaign, deterministic operating-point selection, and uploaded raw/summary/comparison/freeze artifacts.
 
-The short PPO model generated by `RL Smoke` is an integration test only and must not be interpreted as policy-quality evidence.
+The short PPO model generated by `RL Smoke` and the one-seed sensitivity run generated by `CI` are integration tests only and must not be interpreted as policy-quality evidence.
 
 ## Research phases
 
 1. **Validated simulation + deterministic baselines:** complete.
 2. **PPO hyper-heuristic + statistical infrastructure:** complete; long-horizon multi-training-seed experiment pending.
-3. **Rolling-horizon OR benchmark:** controller, stress integration, and sensitivity harness implemented; larger validation sweep and operating-point freeze are next.
+3. **Rolling-horizon OR benchmark:** controller, stress integration, sensitivity harness, and validation-selection workflow implemented; review/freeze of the 30-seed operating point is next.
 4. **Generalization/full comparative study:** infrastructure implemented; full campaign pending.
 5. **True flexible job-shop extension:** planned.
 6. **Decision-twin service layer:** planned.
