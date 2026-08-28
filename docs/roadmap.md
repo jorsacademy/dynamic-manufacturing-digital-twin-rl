@@ -8,7 +8,7 @@ Completed infrastructure:
 
 - reproducible PPO configuration and audit manifests;
 - deterministic out-of-sample evaluation;
-- disjoint training, nominal-test, and stress-test seed regimes;
+- disjoint training, validation, nominal-test, and stress-test seed regimes;
 - raw seed-level KPI tables;
 - bootstrap confidence intervals;
 - paired randomization tests and effect sizes;
@@ -20,7 +20,7 @@ Exit criterion: a multi-training-seed PPO experiment can make a defensible state
 
 ## Phase 3 — Rolling-horizon OR benchmark
 
-Status: in progress; controller, stress integration, and sensitivity infrastructure implemented.
+Status: operating-point validation campaign in progress.
 
 Completed milestones:
 
@@ -37,13 +37,17 @@ Completed milestones:
 - horizon × solver-budget sensitivity grid;
 - seed-level sensitivity results and bootstrap summaries;
 - WTT/latency Pareto-front identification;
-- paired comparison of each sensitivity point against a declared reference configuration.
+- paired comparison of each sensitivity point against a declared reference configuration;
+- validation-only operating-point selector with complete-grid seed checks;
+- dedicated 30-seed OR Validation workflow with uploaded raw, summary, comparison, and freeze artifacts.
 
-Next Phase 3 milestones:
+Current Phase 3 sequence:
 
-- run a larger validation-seed sensitivity campaign;
-- freeze one practical CP-SAT horizon/budget operating point before final test analysis;
-- optionally add a forecast-aware OR variant as a separately declared information regime.
+1. run the 30-seed validation sensitivity campaign on seeds `10000–10029`;
+2. apply the predeclared Pareto + 2% WTT-tolerance latency selection rule;
+3. review and freeze one CP-SAT horizon/budget operating point;
+4. keep that configuration unchanged for all nominal `20000+` and stress `30000+` final-test experiments;
+5. optionally add a forecast-aware OR variant later as a separately declared information regime.
 
 The comparison must report objective quality, feasibility, decision time, robustness, and compute-budget sensitivity. The goal is not to make RL win; it is to identify operating regimes where each controller class is preferable.
 
