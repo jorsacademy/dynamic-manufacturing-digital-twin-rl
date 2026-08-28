@@ -14,9 +14,13 @@ Deliverables:
 - decision-latency reporting;
 - PPO vs eight fixed dispatching rules.
 
+Completed infrastructure: seed-level paired evaluation, confidence intervals, effect sizes, randomization tests, decision-latency measurement, and PPO model adapters.
+
 Exit criterion: the evaluation harness can make a defensible statement about whether PPO improves a predeclared operational KPI under nominal conditions.
 
 ## Phase 3 — Rolling-horizon OR benchmark
+
+Status: planned after the first PPO benchmark.
 
 Add CP-SAT or MILP scheduling with a finite look-ahead horizon.
 
@@ -32,14 +36,18 @@ The goal is not to make RL win. The goal is to identify operating regimes where 
 
 ## Phase 4 — Generalization and stress testing
 
-Train under nominal conditions and test under controlled distribution shifts:
+Status: stress-test infrastructure implemented; learned-policy study pending.
+
+The repository now provides controlled shifts for:
 
 - +20%, +40%, +60% arrival intensity;
-- increased machine breakdown probability;
+- 2x and 4x machine breakdown probability;
 - tighter due dates;
-- unseen machine-speed distributions;
-- setup-heavy product-family mixes;
-- urgent-order bursts.
+- slower machine-speed distributions;
+- higher sequence-dependent setup pressure;
+- compound operational stress.
+
+The learned policy must be trained under nominal conditions and evaluated without retraining across these scenarios. Future simulator extensions will add explicit urgent-order bursts and other event processes rather than approximating them through reward penalties.
 
 Primary output: an uncertainty/disruption response surface showing relative policy performance.
 
@@ -77,7 +85,7 @@ The service layer should support:
 
 ## Follow-on project family
 
-After this repository reaches Phase 4, the same research architecture will be reused in separate repositories for:
+After this repository reaches the learned-policy stress-test milestone, the same research architecture will be reused in separate repositories for:
 
 1. joint production and predictive-maintenance scheduling;
 2. dynamic EV routing and charging;
