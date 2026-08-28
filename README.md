@@ -2,31 +2,32 @@
 
 A research-oriented industrial engineering / operations research project for **dynamic production scheduling under uncertainty**.
 
-The repository implements an event-driven manufacturing digital twin and compares three online scheduling controller classes: fixed dispatching rules, a PPO hyper-heuristic, and rolling-horizon CP-SAT optimization. All controllers share the same simulator transitions and are evaluated with common random seeds.
+The repository implements an event-driven manufacturing digital twin and compares fixed dispatching rules, a PPO hyper-heuristic, and rolling-horizon CP-SAT optimization on common stochastic realizations.
 
 > Current scope: dynamic heterogeneous parallel-machine scheduling. A true flexible job-shop representation with multi-operation routing and precedence constraints is a later phase.
 
 ## Research question
 
-> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and rolling-horizon optimization, after accounting for online decision latency and controller reliability?
+> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and rolling-horizon optimization, after accounting for online decision latency, solver reliability, and RL training-seed variability?
 
 The repository is built around reproducibility, paired benchmarking, model-selection discipline, and disjoint validation/final-test data—not training reward alone.
 
-## Current v0.9 scope
+## Current v0.9 status
 
-Implemented research infrastructure includes:
+Completed research infrastructure includes:
 
 - stochastic arrivals, heterogeneous machines, sequence-dependent setups, breakdown/repair delays, priorities, due dates, and quality risk;
 - fourteen normalized operational state features and eight deterministic dispatching rules;
 - PPO hyper-heuristic training with audit manifests;
 - rolling-horizon CP-SAT with explicit job-machine assignments and released-job-only information;
-- deterministic timeout fallback plus measured solver fallback/success rates;
+- deterministic CP-SAT timeout fallback plus measured solver fallback/success rates;
 - CP-SAT horizon × solve-budget sensitivity analysis;
-- completed 30-seed OR validation campaign and a frozen CP-SAT operating point;
-- long-horizon multi-training-seed PPO validation design;
+- completed 30-seed OR validation campaign and frozen CP-SAT operating point;
+- completed five-training-seed, 750,000-total-timestep PPO validation campaign;
+- independent artifact/hash verification for both controller families;
 - seed-level KPIs, bootstrap confidence intervals, paired randomization tests, effect sizes, and probability of superiority;
 - nominal and distribution-shift evaluation harnesses;
-- Python 3.10/3.11/3.12 CI, RL integration smoke tests, OR Validation, and PPO Validation workflows.
+- Python 3.10/3.11/3.12 CI, RL Smoke, OR Validation, and PPO Validation workflows.
 
 Seed regimes are deliberately separated:
 
@@ -63,21 +64,40 @@ Frozen final-evaluation configuration:
 - validation mean decision latency: **21.4080 ms**;
 - validation mean fallback rate: **0.00%**.
 
-The frozen provenance is stored in [`configs/cpsat_operating_point.json`](configs/cpsat_operating_point.json). This configuration will not be retuned after PPO results are observed.
+The frozen provenance is stored in [`configs/cpsat_operating_point.json`](configs/cpsat_operating_point.json). This configuration will not be retuned after PPO or final-test results are observed.
 
-## PPO multi-training-seed validation
+## Frozen PPO validation campaign
 
-The next research gate is defined in [`configs/ppo_validation_campaign.json`](configs/ppo_validation_campaign.json).
-
-Five independent PPO models are trained with identical hyperparameters:
+Five independent PPO models were trained under the same hyperparameters for `150,000` timesteps each:
 
 - training seeds: `101, 202, 303, 404, 505`;
-- `150,000` timesteps per member;
-- common validation seeds: `10000–10029`.
+- total training: **750,000 timesteps**;
+- common validation seeds: `10000–10029`;
+- final-test seeds were not used for selection.
 
-The research result will **not** cherry-pick the best training seed. All five learned policies remain part of the later scientific evaluation. A single representative model is selected only for deployment/demo continuity using a predeclared median-role rule: choose the training run whose validation WTT mean is closest to the median across all five runs.
+Validation mean priority-weighted tardiness by training seed:
 
-See [`docs/ppo_multiseed.md`](docs/ppo_multiseed.md).
+| Training seed | WTT | PPO decision latency (ms) |
+| ---: | ---: | ---: |
+| 101 | 77.0644 | 0.1922 |
+| 202 | 83.4609 | 0.2469 |
+| 303 | 73.8590 | 0.2763 |
+| 404 | 72.9942 | 0.1911 |
+| 505 | 83.2213 | 0.1036 |
+
+Across the five learned policies:
+
+- mean WTT: **78.1200**;
+- median WTT: **77.0644**;
+- training-seed sample standard deviation: **5.0023**;
+- minimum WTT: **72.9942**;
+- maximum WTT: **83.4609**.
+
+The strongest fixed dispatching rule on the same nominal validation seeds was `WEIGHTED_COMPOSITE` with WTT **73.8590**. Some PPO seeds were competitive, while others were materially worse. The project therefore does not report the best PPO seed as if it represented the algorithm.
+
+The predeclared median-role representative model is **training seed 101**, not the best-performing seed. It exists only for dashboard/demo/service continuity. Final scientific claims retain all five PPO training-seed realizations.
+
+Frozen PPO provenance and artifact hashes are stored in [`configs/ppo_validation_freeze.json`](configs/ppo_validation_freeze.json). See [`docs/ppo_validation_results.md`](docs/ppo_validation_results.md) and [`docs/ppo_multiseed.md`](docs/ppo_multiseed.md).
 
 ## Installation
 
@@ -94,7 +114,7 @@ pytest
 ruff check src tests
 ```
 
-## Train one reproducible PPO member
+## Reproduce one PPO member
 
 ```bash
 dmdtrl-train \
@@ -108,24 +128,9 @@ dmdtrl-train \
 
 See [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md).
 
-## Aggregate a PPO validation campaign
-
-After all declared PPO members and their validation outputs are present under `artifacts/seed_<TRAINING_SEED>/`:
-
-```bash
-dmdtrl-ppo-campaign \
-  --config configs/ppo_validation_campaign.json \
-  --artifacts-root artifacts \
-  --runs-output campaign/ppo_validation_runs.csv \
-  --summary-output campaign/ppo_training_seed_summary.csv \
-  --manifest-output campaign/ppo_validation_manifest.json
-```
-
-The validator verifies training manifests, SHA-256 hashes model artifacts, enforces complete common validation seeds, and refuses validation/final-test leakage.
-
 ## Nominal final evaluation
 
-Final PPO evaluation must not begin until the PPO validation campaign is reviewed and frozen. Final nominal seeds begin at `20000`.
+Both adaptive controller families are now frozen before final-test analysis. Nominal final seeds begin at `20000`.
 
 Frozen CP-SAT command:
 
@@ -140,31 +145,35 @@ dmdtrl-or \
   --comparisons-output results/cpsat_comparisons.csv
 ```
 
-For PPO, the final campaign will evaluate all declared training-seed realizations rather than only the representative model.
+The final PPO campaign evaluates **all five frozen training-seed realizations**, not only representative seed 101. Statistical analysis preserves training-seed variability instead of treating 500 PPO observations as independent repetitions.
 
 ## Distribution-shift evaluation
 
 Built-in scenarios include +20/+40/+60% arrival intensity, 2×/4× breakdown probability, tighter due dates, slower machines, increased setup pressure, and compound stress.
 
-The full final matrix will use frozen PPO settings, frozen CP-SAT `H=8 / 100 ms`, common `30000+` stress seeds, and direct PPO-vs-CP-SAT/fixed-rule comparisons.
+The full final matrix will use frozen PPO models, frozen CP-SAT `H=8 / 100 ms`, common `30000+` stress seeds, and direct paired PPO-vs-CP-SAT/fixed-rule comparisons.
 
 ## GitHub Actions
 
 - `CI`: Python 3.10/3.11/3.12 lint, tests, coverage, research smoke, stress smoke, CP-SAT smoke, and sensitivity smoke.
 - `RL Smoke`: short Stable-Baselines3 training/inference integration test; not policy-quality evidence.
 - `OR Validation`: completed 30-seed CP-SAT validation campaign with reliability gating and artifacts.
-- `PPO Validation`: five independent `150k`-step PPO trainings, common 30-seed validation, per-member artifacts, and aggregate campaign manifest.
+- `PPO Validation`: completed five-member long-horizon PPO campaign with common validation seeds, member artifacts, hashes, and aggregate manifest.
 
 ## Research phases
 
 1. **Validated simulator + deterministic baselines:** complete.
 2. **Rolling-horizon OR baseline and operating-point freeze:** complete; frozen at **H=8 / 100 ms**.
-3. **PPO hyper-heuristic validation:** multi-training-seed long-horizon campaign in progress.
-4. **Full nominal + stress comparative experiment:** next after PPO freeze.
+3. **PPO hyper-heuristic multi-seed validation:** complete; five models frozen, representative seed **101**.
+4. **Full nominal + stress comparative experiment:** next active phase.
 5. **True flexible job-shop extension:** planned.
 6. **Decision-twin service/dashboard layer:** planned.
 
 See [`docs/roadmap.md`](docs/roadmap.md).
+
+## Portfolio sequence
+
+This repository is the first flagship, not the whole portfolio. Planned follow-on repositories cover safe continuous process control, multi-echelon inventory, dynamic vehicle routing, joint maintenance/production scheduling, and adaptive capacity/workforce control. Each will use the same research-grade standard: strong OR/control baselines, stochastic simulation, CI, reproducible experiments, and out-of-sample comparisons.
 
 ## Scientific principle
 

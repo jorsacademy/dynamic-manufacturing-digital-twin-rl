@@ -44,57 +44,61 @@ Freeze rule: H=8 / 100 ms remains unchanged for nominal `20000+` and stress `300
 
 ## Phase 3 — PPO hyper-heuristic multi-seed validation
 
-Status: **long-horizon campaign in progress.**
+Status: **complete and frozen for final evaluation.**
 
-Already implemented:
+Delivered:
 
 - Stable-Baselines3 PPO hyper-heuristic over eight dispatching rules;
 - reproducible training manifests with runtime/package metadata;
-- deterministic out-of-sample evaluation;
+- deterministic out-of-sample validation;
+- five independent 150,000-timestep training runs (`101, 202, 303, 404, 505`);
+- common validation seeds `10000–10029` for every learned policy;
 - bootstrap confidence intervals, paired randomization tests, effect sizes, and probability of superiority;
-- RL Smoke integration workflow;
-- explicit disjoint training/validation/final-test seed regimes.
+- model/manifests SHA-256 verification;
+- aggregate training-seed dispersion reporting;
+- independent download and verification of the aggregate GitHub Actions artifact;
+- median-role representative-model selection that does not cherry-pick the best PPO seed;
+- frozen validation provenance in `configs/ppo_validation_freeze.json`.
 
-The v0.9 campaign is predeclared in `configs/ppo_validation_campaign.json`:
+Validation WTT by training seed:
 
-- five independent training seeds: `101, 202, 303, 404, 505`;
-- 150,000 timesteps per training member;
-- fixed PPO hyperparameters across all members;
-- common validation seeds `10000–10029`;
-- model archives and manifests retained as workflow artifacts;
-- SHA-256 artifact verification;
-- one validation summary row per training seed;
-- aggregate training-seed dispersion;
-- a representative model selected by median-role WTT, not by best validation performance.
+- seed 101: **77.0644**;
+- seed 202: **83.4609**;
+- seed 303: **73.8590**;
+- seed 404: **72.9942**;
+- seed 505: **83.2213**.
 
-Scientific rule: **final PPO claims aggregate all five declared training seeds.** The representative model exists only for demo/deployment continuity and must not replace multi-seed evidence.
+Across the five independent training seeds:
 
-Exit criterion:
+- mean WTT: **78.1200**;
+- median WTT: **77.0644**;
+- sample standard deviation: **5.0023**;
+- minimum: **72.9942**;
+- maximum: **83.4609**.
 
-1. all five 150k-step trainings complete successfully;
-2. every member contains the complete common validation seed set;
-3. campaign manifest and artifact hashes are verified;
-4. training-seed variability is reviewed;
-5. the representative model identity and PPO design are frozen without using `20000+` or `30000+` data.
+The predeclared median-role representative model is **training seed 101**, with model SHA-256 `a3172d12c59a8585a2ded6ff8e1ae2bbf3287b5ca97d183cf06841e12d6980e3`.
 
-See `docs/ppo_multiseed.md`.
+Scientific rule: **final PPO claims retain all five declared training-seed realizations.** Seed 101 is only the representative model for demo/deployment continuity and is not substituted for multi-seed evidence.
+
+See `docs/ppo_multiseed.md` and `docs/ppo_validation_results.md`.
 
 ## Phase 4 — Full nominal and distribution-shift comparison
 
-Status: **next after PPO freeze.**
+Status: **next active research phase.**
 
-Controllers:
+Controllers are now frozen before final-test data are analyzed:
 
-- all five frozen PPO training-seed realizations;
-- frozen CP-SAT H=8 / 100 ms;
+- all five PPO training-seed realizations;
+- CP-SAT H=8 / 100 ms;
 - all eight fixed dispatching rules.
 
 Nominal final-test regime:
 
 - common seeds beginning at `20000`;
 - priority-weighted tardiness as the primary operational KPI;
-- decision latency and reliability reported alongside objective quality;
-- paired controller comparisons on identical stochastic realizations.
+- decision latency and CP-SAT reliability reported alongside objective quality;
+- training-seed variability retained explicitly;
+- direct paired controller comparisons on identical stochastic environment seeds.
 
 Stress final-test regime begins at `30000` and includes:
 
