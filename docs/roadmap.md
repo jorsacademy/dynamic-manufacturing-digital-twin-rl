@@ -20,32 +20,34 @@ Exit criterion: a multi-training-seed PPO experiment can make a defensible state
 
 ## Phase 3 — Rolling-horizon OR benchmark
 
-Status: in progress; nominal and distribution-shift infrastructure implemented.
+Status: in progress; controller, stress integration, and sensitivity infrastructure implemented.
 
 Completed milestones:
 
-- explicit job-machine decision path through the same simulator transition logic used by RL;
-- rolling-horizon CP-SAT over released jobs only;
+- explicit job-machine decisions through the same simulator transition logic used by RL;
+- released-job-only rolling-horizon CP-SAT;
 - heterogeneous machine-dependent processing times;
-- sequence-dependent initial and inter-job setup transitions;
-- strictly primary priority-weighted tardiness objective with setup/makespan tie breakers;
-- fixed online solver budget and measured decision latency;
-- paired nominal comparison against all eight dispatching rules;
-- CP-SAT integration into the predefined distribution-shift suite;
-- scenario-local paired CP-SAT vs fixed-rule comparisons;
-- matched stress tables that can contain PPO, CP-SAT, and all fixed rules on identical seeds.
+- sequence-dependent initial and inter-job setups;
+- strictly primary priority-weighted tardiness objective;
+- bounded online solve time and measured decision latency;
+- paired nominal comparison against all eight fixed rules;
+- CP-SAT integration into every predefined distribution-shift scenario;
+- scenario-local paired CP-SAT comparisons;
+- matched PPO / CP-SAT / fixed-rule stress tables;
+- horizon × solver-budget sensitivity grid;
+- seed-level sensitivity results and bootstrap summaries;
+- WTT/latency Pareto-front identification;
+- paired comparison of each sensitivity point against a declared reference configuration.
 
 Next Phase 3 milestones:
 
-- horizon-length sensitivity study;
-- solver-budget sensitivity study;
-- larger-seed nominal and stress benchmarks;
-- direct PPO vs CP-SAT operating-region analysis after long-horizon PPO training;
+- run a larger validation-seed sensitivity campaign;
+- freeze one practical CP-SAT horizon/budget operating point before final test analysis;
 - optionally add a forecast-aware OR variant as a separately declared information regime.
 
 The comparison must report objective quality, feasibility, decision time, robustness, and compute-budget sensitivity. The goal is not to make RL win; it is to identify operating regimes where each controller class is preferable.
 
-## Phase 4 — Generalization and stress testing
+## Phase 4 — Generalization and full comparative experiment
 
 Status: comparative infrastructure implemented; full experimental campaign pending.
 
@@ -58,9 +60,14 @@ Controlled shifts currently include:
 - higher sequence-dependent setup pressure;
 - compound operational stress.
 
-PPO must be trained under nominal conditions and evaluated without retraining. CP-SAT must use only the information available at each decision epoch. All controllers are evaluated on common random seeds within each scenario.
+Before the final campaign:
 
-Primary output: response surfaces showing how operational performance and decision latency change with uncertainty/disruption level, including the paired advantage of PPO and CP-SAT over the strongest fixed-rule comparator.
+1. freeze the CP-SAT operating point using validation seeds;
+2. train PPO for a scientifically adequate horizon across multiple independent training seeds;
+3. freeze PPO training/model-selection settings without using final test seeds;
+4. evaluate PPO, frozen CP-SAT, and fixed rules on common nominal and stress test seeds.
+
+Primary output: response surfaces showing how operational performance and decision latency change with uncertainty/disruption level, including direct paired PPO-vs-CP-SAT comparisons and each controller's advantage over the strongest fixed-rule comparator.
 
 ## Phase 5 — True flexible job-shop extension
 
@@ -85,7 +92,7 @@ The service layer should support current WIP, machine/disruption state, selected
 
 ## Follow-on project family
 
-After the learned-policy/OR stress-test milestone, the same architecture can be reused for:
+After the learned-policy/OR comparative milestone, the same architecture can be reused for:
 
 1. joint production and predictive-maintenance scheduling;
 2. dynamic EV routing and charging;
