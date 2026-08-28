@@ -35,6 +35,12 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
         description="Run seed-level scheduling experiments with statistical comparisons."
     )
     parser.add_argument("--seeds", type=int, default=50, help="Number of common random seeds.")
+    parser.add_argument(
+        "--seed-start",
+        type=int,
+        default=20_000,
+        help="First nominal evaluation seed; keep disjoint from training/model-selection seeds.",
+    )
     parser.add_argument("--model", type=Path, default=None, help="Optional Stable-Baselines3 PPO model.")
     parser.add_argument("--raw-output", type=Path, default=Path("results/research_runs.csv"))
     parser.add_argument("--summary-output", type=Path, default=Path("results/research_summary.csv"))
@@ -47,11 +53,14 @@ def main() -> None:  # pragma: no cover - CLI smoke-tested in GitHub Actions
 
     if args.seeds <= 0:
         parser.error("--seeds must be positive")
+    if args.seed_start < 0:
+        parser.error("--seed-start must be non-negative")
     policies = fixed_policies()
     if args.model is not None:
         policies.append(load_ppo_policy(args.model))
 
-    rows = experiments.evaluate_policies(policies, range(args.seeds), EnvConfig())
+    seeds = range(args.seed_start, args.seed_start + args.seeds)
+    rows = experiments.evaluate_policies(policies, seeds, EnvConfig())
     summaries = experiments.summarize_runs(rows, n_bootstrap=args.bootstrap)
     experiments.write_csv(rows, args.raw_output)
     experiments.write_csv(summaries, args.summary_output)
