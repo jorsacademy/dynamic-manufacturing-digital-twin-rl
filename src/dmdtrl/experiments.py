@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import csv
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from statistics import mean
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
