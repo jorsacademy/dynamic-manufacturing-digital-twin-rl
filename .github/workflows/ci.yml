@@ -45,3 +45,16 @@ jobs:
           --permutations 100
           --raw-output /tmp/research_runs.csv
           --summary-output /tmp/research_summary.csv
+
+      - name: Distribution-shift smoke test
+        if: matrix.python-version == '3.11'
+        run: >-
+          dmdtrl-stress
+          --seeds 1
+          --seed-start 30000
+          --scenario nominal
+          --scenario demand_140
+          --bootstrap 100
+          --permutations 100
+          --raw-output /tmp/stress_runs.csv
+          --summary-output /tmp/stress_summary.csv
