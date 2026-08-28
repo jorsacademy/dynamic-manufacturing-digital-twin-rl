@@ -10,9 +10,9 @@ The repository implements an event-driven manufacturing digital twin and formula
 
 > Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and, later, rolling-horizon OR methods?
 
-The project is intentionally structured around **benchmarking and statistical validation**, not training reward alone.
+The project is intentionally structured around **benchmarking, stress testing, and statistical validation**, not training reward alone.
 
-## Current v0.2 scope
+## Current v0.3 scope
 
 The digital twin includes:
 
@@ -32,6 +32,8 @@ The digital twin includes:
 - paired randomization tests;
 - paired effect sizes and probability of superiority;
 - online decision-latency measurement;
+- controlled distribution-shift scenarios;
+- compound operational stress testing;
 - automated unit tests and GitHub Actions CI.
 
 ## RL formulation
@@ -124,7 +126,7 @@ ruff check src tests
 
 ## Benchmark fixed dispatching rules
 
-The original compact baseline command remains available:
+The compact baseline command remains available:
 
 ```bash
 dmdtrl-baselines --seeds 30 --output results/baselines.csv
@@ -163,7 +165,49 @@ For every candidate-vs-baseline KPI comparison, the harness reports:
 - probability of superiority;
 - number of paired stochastic seeds.
 
-All policies are evaluated with the same random seeds so they face comparable synthetic job streams and disruptions.
+## Distribution-shift stress testing
+
+The stress suite evaluates the same policies on controlled out-of-distribution operating conditions. Built-in scenarios include:
+
+- nominal conditions;
+- +20%, +40%, and +60% arrival intensity;
+- 2x and 4x breakdown probability;
+- 15% tighter due-date allowances;
+- 10% slower machine-speed distributions;
+- 2x sequence-dependent setup time;
+- a compound severe scenario combining demand, failure, due-date, speed, and setup pressure.
+
+Run the full stress matrix on fixed policies:
+
+```bash
+dmdtrl-stress \
+  --seeds 30 \
+  --seed-start 30000 \
+  --raw-output results/stress_runs.csv \
+  --summary-output results/stress_summary.csv
+```
+
+Run selected scenarios only:
+
+```bash
+dmdtrl-stress \
+  --scenario nominal \
+  --scenario demand_140 \
+  --scenario compound_stress \
+  --seeds 50
+```
+
+After PPO training, add the learned policy to the same paired stress tests:
+
+```bash
+dmdtrl-stress \
+  --model models/ppo_dispatcher.zip \
+  --seeds 100 \
+  --seed-start 30000 \
+  --comparisons-output results/stress_ppo_comparisons.csv
+```
+
+The objective is to estimate a **robustness profile**, not merely one nominal test score: how quickly each policy degrades as demand, failures, due-date pressure, and processing capacity move away from training-like conditions.
 
 ## Train PPO
 
@@ -180,7 +224,8 @@ The trained Stable-Baselines3 model is saved as `models/ppo_dispatcher.zip`.
 ├── .github/workflows/ci.yml
 ├── docs/
 │   ├── research_protocol.md
-│   └── roadmap.md
+│   ├── roadmap.md
+│   └── stress_scenarios.md
 ├── src/dmdtrl/
 │   ├── dispatch.py
 │   ├── env.py
@@ -190,7 +235,9 @@ The trained Stable-Baselines3 model is saved as `models/ppo_dispatcher.zip`.
 │   ├── models.py
 │   ├── policies.py
 │   ├── research.py
+│   ├── scenarios.py
 │   ├── statistics.py
+│   ├── stress.py
 │   └── train.py
 ├── tests/
 ├── pyproject.toml
@@ -213,15 +260,7 @@ Add CP-SAT / MILP scheduling baselines and compare solution quality, compute tim
 
 ### Phase 4 — generalization study
 
-Train under nominal conditions and test under distribution shifts:
-
-- +20% / +40% / +60% arrival intensity;
-- elevated breakdown probability;
-- unseen machine-speed profiles;
-- changed job-family mix;
-- setup-heavy mixes;
-- tighter due dates;
-- urgent-order bursts.
+Stress-test infrastructure is implemented. The next step is to train candidate policies only on nominal conditions and evaluate them without retraining across the predefined distribution-shift matrix.
 
 The key scientific output will be the relationship between uncertainty/disruption level and the relative advantage of adaptive policies.
 
@@ -235,7 +274,7 @@ Expose current twin state and recommended actions through an API/dashboard suita
 
 ## Scientific protocol
 
-See [`docs/research_protocol.md`](docs/research_protocol.md) for predeclared evaluation standards and [`docs/roadmap.md`](docs/roadmap.md) for the phased research plan.
+See [`docs/research_protocol.md`](docs/research_protocol.md) for predeclared evaluation standards, [`docs/stress_scenarios.md`](docs/stress_scenarios.md) for the OOD scenario definitions, and [`docs/roadmap.md`](docs/roadmap.md) for the phased research plan.
 
 A learned policy should not be described as superior merely because training reward increases. If a classical OR or dispatching policy is faster, more robust, or operationally better, that is a valid and useful research result.
 
