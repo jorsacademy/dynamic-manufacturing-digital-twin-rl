@@ -2,7 +2,7 @@
 
 ## Phase 2 — PPO hyper-heuristic with statistical validation
 
-Status: in progress.
+Status: infrastructure complete; long-horizon multi-training-seed study pending.
 
 Deliverables:
 
@@ -14,15 +14,31 @@ Deliverables:
 - decision-latency reporting;
 - PPO vs eight fixed dispatching rules.
 
-Completed infrastructure: seed-level paired evaluation, confidence intervals, effect sizes, randomization tests, decision-latency measurement, and PPO model adapters.
+Completed infrastructure: seed-level paired evaluation, confidence intervals, effect sizes, randomization tests, decision-latency measurement, PPO model adapters, audit manifests, disjoint nominal/stress seed ranges, and real Stable-Baselines3 integration CI.
 
-Exit criterion: the evaluation harness can make a defensible statement about whether PPO improves a predeclared operational KPI under nominal conditions.
+Exit criterion: a multi-training-seed PPO experiment can make a defensible statement about whether PPO improves a predeclared operational KPI under nominal conditions.
 
 ## Phase 3 — Rolling-horizon OR benchmark
 
-Status: planned after the first PPO benchmark.
+Status: in progress.
 
-Add CP-SAT or MILP scheduling with a finite look-ahead horizon.
+Current implementation milestone:
+
+- explicit job-machine decision path through the same simulator transition logic used by RL;
+- rolling-horizon CP-SAT over released jobs only;
+- heterogeneous machine-dependent processing times;
+- sequence-dependent initial and inter-job setup transitions;
+- priority-weighted tardiness objective with setup/makespan tie breakers;
+- fixed online solver budget and measured decision latency;
+- paired nominal comparison against all eight dispatching rules.
+
+Next Phase 3 milestones:
+
+- validate the nominal CP-SAT benchmark across a larger seed set;
+- add CP-SAT to the predefined distribution-shift suite;
+- run three-way PPO vs CP-SAT vs fixed-rule comparisons;
+- study horizon length and solver-budget sensitivity;
+- optionally add a forecast-aware OR variant as a separately declared information regime.
 
 Compare:
 
@@ -30,13 +46,14 @@ Compare:
 - feasibility;
 - solve/decision time;
 - robustness to disruptions;
-- value of reoptimization frequency.
+- value of reoptimization frequency;
+- sensitivity to horizon and compute budget.
 
 The goal is not to make RL win. The goal is to identify operating regimes where each approach is preferable.
 
 ## Phase 4 — Generalization and stress testing
 
-Status: stress-test infrastructure implemented; learned-policy study pending.
+Status: stress-test infrastructure implemented; learned-policy and OR comparative study pending.
 
 The repository now provides controlled shifts for:
 
@@ -47,7 +64,7 @@ The repository now provides controlled shifts for:
 - higher sequence-dependent setup pressure;
 - compound operational stress.
 
-The learned policy must be trained under nominal conditions and evaluated without retraining across these scenarios. Future simulator extensions will add explicit urgent-order bursts and other event processes rather than approximating them through reward penalties.
+The learned policy must be trained under nominal conditions and evaluated without retraining across these scenarios. The OR controller must use only the information explicitly available at each decision epoch. Future simulator extensions will add explicit urgent-order bursts and other event processes rather than approximating them through reward penalties.
 
 Primary output: an uncertainty/disruption response surface showing relative policy performance.
 
@@ -76,16 +93,16 @@ The service layer should support:
 
 - current WIP and queue state;
 - machine availability and disruption state;
-- selected dispatch rule;
+- selected dispatch rule or OR assignment;
 - predicted tardiness risk;
-- baseline vs learned-policy KPI comparison;
+- baseline vs learned-policy vs OR KPI comparison;
 - what-if scenarios.
 
 3D visualization is optional. The core industrial-engineering value is the synchronized decision model, not graphics.
 
 ## Follow-on project family
 
-After this repository reaches the learned-policy stress-test milestone, the same research architecture will be reused in separate repositories for:
+After this repository reaches the learned-policy/OR stress-test milestone, the same research architecture will be reused in separate repositories for:
 
 1. joint production and predictive-maintenance scheduling;
 2. dynamic EV routing and charging;
