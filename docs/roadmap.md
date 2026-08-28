@@ -2,7 +2,7 @@
 
 ## Phase 2 — PPO hyper-heuristic with statistical validation
 
-Status: infrastructure complete; long-horizon multi-training-seed study pending.
+Status: infrastructure complete; long-horizon multi-training-seed study is the next major workload.
 
 Completed infrastructure:
 
@@ -20,7 +20,7 @@ Exit criterion: a multi-training-seed PPO experiment can make a defensible state
 
 ## Phase 3 — Rolling-horizon OR benchmark
 
-Status: operating-point validation campaign in progress.
+Status: **operating point frozen for final evaluation.**
 
 Completed milestones:
 
@@ -30,6 +30,7 @@ Completed milestones:
 - sequence-dependent initial and inter-job setups;
 - strictly primary priority-weighted tardiness objective;
 - bounded online solve time and measured decision latency;
+- deterministic emergency fallback for solver `UNKNOWN` timeouts, with fallback-rate reporting;
 - paired nominal comparison against all eight fixed rules;
 - CP-SAT integration into every predefined distribution-shift scenario;
 - scenario-local paired CP-SAT comparisons;
@@ -38,22 +39,32 @@ Completed milestones:
 - seed-level sensitivity results and bootstrap summaries;
 - WTT/latency Pareto-front identification;
 - paired comparison of each sensitivity point against a declared reference configuration;
-- validation-only operating-point selector with complete-grid seed checks;
-- dedicated 30-seed OR Validation workflow with uploaded raw, summary, comparison, and freeze artifacts.
+- validation-only operating-point selector with complete-grid and solver-reliability checks;
+- 30-seed OR Validation campaign on seeds `10000–10029`;
+- uploaded validation raw/summary/comparison/manifest artifact with verified SHA-256;
+- frozen CP-SAT operating point committed in `configs/cpsat_operating_point.json`.
 
-Current Phase 3 sequence:
+### Frozen OR operating point
 
-1. run the 30-seed validation sensitivity campaign on seeds `10000–10029`;
-2. apply the predeclared Pareto + 2% WTT-tolerance latency selection rule;
-3. review and freeze one CP-SAT horizon/budget operating point;
-4. keep that configuration unchanged for all nominal `20000+` and stress `30000+` final-test experiments;
-5. optionally add a forecast-aware OR variant later as a separately declared information regime.
+The 30-seed 3×3 validation sweep selected:
 
-The comparison must report objective quality, feasibility, decision time, robustness, and compute-budget sensitivity. The goal is not to make RL win; it is to identify operating regimes where each controller class is preferable.
+- horizon: **8 released jobs**;
+- solver budget: **100 ms per decision**;
+- validation mean priority-weighted tardiness: **72.5101**;
+- validation mean decision latency: **21.4080 ms**;
+- validation mean solver fallback rate: **0.00%**.
+
+The best reliable Pareto WTT was 72.5101 and the predeclared 2% acceptance threshold was 73.9603. H8 / 50 ms achieved WTT 74.138 and therefore fell outside the declared tolerance despite its lower latency. H8 / 100 ms was consequently the only acceptable Pareto configuration.
+
+Relative to the declared H12 / 100 ms reference, H8 / 100 ms showed a 5.59% lower mean WTT on validation seeds, but the paired 95% interval crossed zero and the paired randomization p-value was about 0.225. This is model-selection evidence, not a claim of statistically established superiority.
+
+Phase 3 freeze rule: **H=8 and 0.10 s must remain unchanged for nominal `20000+` and stress `30000+` final-test experiments.**
+
+A forecast-aware OR variant may be added later only as a separately declared information regime; it must not replace or retune the frozen comparator after final-test inspection.
 
 ## Phase 4 — Generalization and full comparative experiment
 
-Status: comparative infrastructure implemented; full experimental campaign pending.
+Status: comparative infrastructure implemented; full experimental campaign pending after PPO model selection is frozen.
 
 Controlled shifts currently include:
 
@@ -66,10 +77,10 @@ Controlled shifts currently include:
 
 Before the final campaign:
 
-1. freeze the CP-SAT operating point using validation seeds;
+1. **CP-SAT operating point: complete and frozen at H=8 / 100 ms.**
 2. train PPO for a scientifically adequate horizon across multiple independent training seeds;
-3. freeze PPO training/model-selection settings without using final test seeds;
-4. evaluate PPO, frozen CP-SAT, and fixed rules on common nominal and stress test seeds.
+3. select/freeze PPO settings using validation data only;
+4. evaluate PPO, frozen CP-SAT, and fixed rules on common nominal and stress final-test seeds.
 
 Primary output: response surfaces showing how operational performance and decision latency change with uncertainty/disruption level, including direct paired PPO-vs-CP-SAT comparisons and each controller's advantage over the strongest fixed-rule comparator.
 
