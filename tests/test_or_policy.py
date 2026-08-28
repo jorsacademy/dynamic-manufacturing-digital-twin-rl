@@ -85,3 +85,28 @@ def test_cpsat_returns_released_job_and_available_machine() -> None:
     assert decision.job_id in {job.job_id for job in env.queued_jobs()}
     assert decision.machine_id in {machine.machine_id for machine in env.available_machines()}
     assert decision.solver_status in {"OPTIMAL", "FEASIBLE"}
+    assert not decision.used_fallback
+
+
+def test_timeout_fallback_returns_deterministic_feasible_assignment() -> None:
+    env = DynamicManufacturingEnv(
+        EnvConfig(
+            n_jobs=6,
+            n_machines=2,
+            mean_interarrival=0.01,
+            breakdown_probability=0.0,
+        )
+    )
+    env.reset(seed=31)
+    policy = RollingHorizonCPSATPolicy(CPSATConfig(max_jobs=4, time_limit_s=0.01))
+    jobs = select_horizon(env.queued_jobs(), max_jobs=4)
+    machines = env.available_machines()
+
+    first = policy._fallback_decision(env, jobs, machines, "UNKNOWN")
+    second = policy._fallback_decision(env, jobs, machines, "UNKNOWN")
+
+    assert first == second
+    assert first.used_fallback
+    assert first.solver_status == "UNKNOWN"
+    assert first.job_id in {job.job_id for job in jobs}
+    assert first.machine_id in {machine.machine_id for machine in machines}
