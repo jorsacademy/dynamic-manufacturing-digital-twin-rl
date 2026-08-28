@@ -35,3 +35,13 @@ jobs:
 
       - name: Test
         run: pytest --cov=dmdtrl --cov-report=term-missing --cov-fail-under=85
+
+      - name: Research harness smoke test
+        if: matrix.python-version == '3.11'
+        run: >-
+          dmdtrl-research
+          --seeds 2
+          --bootstrap 100
+          --permutations 100
+          --raw-output /tmp/research_runs.csv
+          --summary-output /tmp/research_summary.csv
