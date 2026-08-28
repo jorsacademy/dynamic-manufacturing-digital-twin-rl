@@ -82,7 +82,7 @@ jobs:
         run: >-
           dmdtrl-or-sensitivity
           --seeds 1
-          --seed-start 21000
+          --seed-start 10000
           --horizon 4
           --horizon 6
           --solver-seconds 0.05
