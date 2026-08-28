@@ -220,8 +220,9 @@ def compare_candidate_to_baselines(
 def write_csv(rows: list[dict[str, float | int | str]], output: Path) -> None:
     if not rows:
         raise ValueError("cannot write an empty CSV")
+    fieldnames = list(dict.fromkeys(key for row in rows for key in row))
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
