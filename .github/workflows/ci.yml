@@ -28,7 +28,7 @@ jobs:
           cache: pip
 
       - name: Install package and test tools
-        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+        run: python -m pip install --upgrade pip && pip install -e ".[dev,or]"
 
       - name: Lint
         run: ruff check src tests
@@ -58,3 +58,17 @@ jobs:
           --permutations 100
           --raw-output /tmp/stress_runs.csv
           --summary-output /tmp/stress_summary.csv
+
+      - name: Rolling-horizon CP-SAT smoke test
+        if: matrix.python-version == '3.11'
+        run: >-
+          dmdtrl-or
+          --seeds 1
+          --seed-start 20000
+          --horizon 6
+          --solver-seconds 0.10
+          --bootstrap 100
+          --permutations 100
+          --raw-output /tmp/or_runs.csv
+          --summary-output /tmp/or_summary.csv
+          --comparisons-output /tmp/or_comparisons.csv
