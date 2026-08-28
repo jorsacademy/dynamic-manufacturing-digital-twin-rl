@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from enum import IntEnum
-from typing import Sequence
 
 import numpy as np
 
@@ -40,28 +40,41 @@ def select_job(
         raise ValueError("queue must contain at least one job")
 
     if rule is DispatchRule.FIFO:
-        key = lambda j: (j.arrival_time, j.job_id)
-    elif rule is DispatchRule.HIGHEST_PRIORITY:
-        key = lambda j: (-j.priority, j.due_date, j.job_id)
-    elif rule is DispatchRule.EARLIEST_DUE_DATE:
-        key = lambda j: (j.due_date, -j.priority, j.job_id)
-    elif rule is DispatchRule.SHORTEST_PROCESSING_TIME:
-        key = lambda j: (j.processing_time / machine.speed, j.due_date, j.job_id)
-    elif rule is DispatchRule.SAME_FAMILY_FIRST:
-        key = lambda j: (0 if machine.last_family == j.family else 1, j.due_date, j.job_id)
-    elif rule is DispatchRule.MINIMUM_SETUP:
-        key = lambda j: (_setup(j, machine, setup_time), j.due_date, j.job_id)
-    elif rule is DispatchRule.CRITICAL_RATIO:
-        key = lambda j: (
-            (j.due_date - current_time) / max(j.processing_time / machine.speed, 1e-9),
-            -j.priority,
-            j.job_id,
+        return min(queue, key=lambda j: (j.arrival_time, j.job_id))
+    if rule is DispatchRule.HIGHEST_PRIORITY:
+        return min(queue, key=lambda j: (-j.priority, j.due_date, j.job_id))
+    if rule is DispatchRule.EARLIEST_DUE_DATE:
+        return min(queue, key=lambda j: (j.due_date, -j.priority, j.job_id))
+    if rule is DispatchRule.SHORTEST_PROCESSING_TIME:
+        return min(
+            queue,
+            key=lambda j: (j.processing_time / machine.speed, j.due_date, j.job_id),
         )
-    elif rule is DispatchRule.WEIGHTED_COMPOSITE:
+    if rule is DispatchRule.SAME_FAMILY_FIRST:
+        return min(
+            queue,
+            key=lambda j: (
+                0 if machine.last_family == j.family else 1,
+                j.due_date,
+                j.job_id,
+            ),
+        )
+    if rule is DispatchRule.MINIMUM_SETUP:
+        return min(queue, key=lambda j: (_setup(j, machine, setup_time), j.due_date, j.job_id))
+    if rule is DispatchRule.CRITICAL_RATIO:
+        return min(
+            queue,
+            key=lambda j: (
+                (j.due_date - current_time) / max(j.processing_time / machine.speed, 1e-9),
+                -j.priority,
+                j.job_id,
+            ),
+        )
+    if rule is DispatchRule.WEIGHTED_COMPOSITE:
         max_proc = max(j.processing_time for j in queue)
         max_due = max(max(j.due_date - current_time, 0.0) for j in queue) or 1.0
 
-        def key(j: Job) -> tuple[float, int]:
+        def composite_key(j: Job) -> tuple[float, int]:
             proc = (j.processing_time / machine.speed) / max(max_proc, 1e-9)
             due_pressure = max(j.due_date - current_time, 0.0) / max_due
             setup = _setup(j, machine, setup_time) / max(setup_time, 1e-9)
@@ -75,10 +88,10 @@ def select_job(
                 + 0.05 * risk
             )
             return (float(score), j.job_id)
-    else:  # pragma: no cover
-        raise ValueError(f"unsupported dispatch rule: {rule}")
 
-    return min(queue, key=key)
+        return min(queue, key=composite_key)
+
+    raise ValueError(f"unsupported dispatch rule: {rule}")  # pragma: no cover
 
 
 def rule_from_action(action: int | np.integer) -> DispatchRule:
