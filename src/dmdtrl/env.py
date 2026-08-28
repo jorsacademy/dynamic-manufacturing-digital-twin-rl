@@ -40,9 +40,9 @@ class EnvConfig:
 class DynamicManufacturingEnv(gym.Env[np.ndarray, int]):
     """Event-driven digital twin for dynamic parallel-machine scheduling.
 
-    The RL action does not select a variable job identifier. It selects one of
-    eight dispatching rules, making the environment suitable for stable policy
-    learning as a scheduling hyper-heuristic.
+    The RL action selects one of eight dispatching rules. Research baselines
+    that make explicit job-machine decisions can use ``step_assignment``;
+    both paths execute through the same stochastic transition logic.
     """
 
     metadata = {"render_modes": ["ansi"]}
@@ -109,13 +109,7 @@ class DynamicManufacturingEnv(gym.Env[np.ndarray, int]):
         return self._observation(), self._info()
 
     def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
-        if len(self._completed_job_ids) >= self.config.n_jobs:
-            raise RuntimeError("episode is already terminated; call reset()")
-        if not self.queue:
-            self._advance_to_decision()
-        if not self.queue:
-            raise RuntimeError("no schedulable job available")
-
+        self._ensure_schedulable()
         rule = rule_from_action(action)
         machine = min(self._available_machines(), key=lambda m: (m.available_at, m.machine_id))
         job = select_job(
@@ -125,6 +119,52 @@ class DynamicManufacturingEnv(gym.Env[np.ndarray, int]):
             rule=rule,
             setup_time=self.config.sequence_setup_time,
         )
+        return self._execute_assignment(job, machine, rule.name)
+
+    def step_assignment(
+        self,
+        job_id: int,
+        machine_id: int,
+        *,
+        decision_label: str = "EXTERNAL",
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        """Execute an explicit released-job / currently-available-machine decision."""
+        self._ensure_schedulable()
+        try:
+            job = next(job for job in self.queue if job.job_id == int(job_id))
+        except StopIteration as exc:
+            raise ValueError(f"job_id {job_id} is not in the released queue") from exc
+
+        available = {machine.machine_id: machine for machine in self._available_machines()}
+        try:
+            machine = available[int(machine_id)]
+        except KeyError as exc:
+            raise ValueError(f"machine_id {machine_id} is not currently available") from exc
+
+        return self._execute_assignment(job, machine, decision_label)
+
+    def queued_jobs(self) -> tuple[Job, ...]:
+        """Return an immutable snapshot of jobs released at the current decision epoch."""
+        return tuple(self.queue)
+
+    def available_machines(self) -> tuple[Machine, ...]:
+        """Return an immutable snapshot of machines available at the current decision epoch."""
+        return tuple(self._available_machines())
+
+    def _ensure_schedulable(self) -> None:
+        if len(self._completed_job_ids) >= self.config.n_jobs:
+            raise RuntimeError("episode is already terminated; call reset()")
+        if not self.queue:
+            self._advance_to_decision()
+        if not self.queue:
+            raise RuntimeError("no schedulable job available")
+
+    def _execute_assignment(
+        self,
+        job: Job,
+        machine: Machine,
+        decision_label: str,
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
         self.queue.remove(job)
 
         start = max(self.current_time, machine.available_at, job.arrival_time)
@@ -161,7 +201,7 @@ class DynamicManufacturingEnv(gym.Env[np.ndarray, int]):
             tardiness=tardiness,
             weighted_tardiness=weighted_tardiness,
             on_time=on_time,
-            rule=rule.name,
+            rule=decision_label,
         )
         self.schedule.append(op)
         self._completed_job_ids.add(job.job_id)
