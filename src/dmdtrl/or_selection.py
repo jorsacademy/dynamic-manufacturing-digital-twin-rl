@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
-
 
 VALIDATION_SEED_MIN = 10_000
 VALIDATION_SEED_MAX_EXCLUSIVE = 20_000
@@ -52,13 +53,20 @@ def validate_validation_seeds(
         raise ValueError("raw sensitivity results are empty")
 
     expected = list(range(seed_start, seed_start + seed_count))
-    observed = sorted({int(row["seed"]) for row in raw_rows})
-    if observed != expected:
-        raise ValueError(
-            f"raw sensitivity seeds do not match declared validation range: "
-            f"expected {expected[0]}..{expected[-1]}, observed {observed}"
-        )
-    return observed
+    expected_set = set(expected)
+    by_policy: dict[str, set[int]] = defaultdict(set)
+    for row in raw_rows:
+        by_policy[str(row["policy"])].add(int(row["seed"]))
+    if len(by_policy) < 2:
+        raise ValueError("raw sensitivity results must contain at least two configurations")
+
+    for policy, observed in sorted(by_policy.items()):
+        if observed != expected_set:
+            raise ValueError(
+                f"raw sensitivity seeds for {policy!r} do not match declared validation range: "
+                f"expected {expected[0]}..{expected[-1]}, observed {sorted(observed)}"
+            )
+    return expected
 
 
 def select_operating_point(
@@ -71,19 +79,26 @@ def select_operating_point(
     if not summary_rows:
         raise ValueError("sensitivity summary is empty")
 
-    missing = REQUIRED_SUMMARY_FIELDS - set(summary_rows[0])
-    if missing:
-        raise ValueError(f"sensitivity summary is missing fields: {sorted(missing)}")
-
     parsed: list[dict[str, Any]] = []
     for row in summary_rows:
+        missing = REQUIRED_SUMMARY_FIELDS - set(row)
+        if missing:
+            raise ValueError(f"sensitivity summary is missing fields: {sorted(missing)}")
+        weighted_tardiness = float(row["weighted_tardiness_mean"])
+        latency = float(row["mean_decision_time_ms_mean"])
+        solver_budget_ms = float(row["solver_budget_ms"])
+        horizon = int(float(row["cpsat_horizon"]))
+        if not all(math.isfinite(value) for value in (weighted_tardiness, latency, solver_budget_ms)):
+            raise ValueError("sensitivity summary contains a non-finite numeric value")
+        if weighted_tardiness < 0 or latency < 0 or solver_budget_ms <= 0 or horizon <= 0:
+            raise ValueError("sensitivity summary contains an invalid operational value")
         parsed.append(
             {
                 **row,
-                "weighted_tardiness_mean": float(row["weighted_tardiness_mean"]),
-                "mean_decision_time_ms_mean": float(row["mean_decision_time_ms_mean"]),
-                "cpsat_horizon": int(float(row["cpsat_horizon"])),
-                "solver_budget_ms": float(row["solver_budget_ms"]),
+                "weighted_tardiness_mean": weighted_tardiness,
+                "mean_decision_time_ms_mean": latency,
+                "cpsat_horizon": horizon,
+                "solver_budget_ms": solver_budget_ms,
                 "pareto_optimal": _as_bool(row["pareto_optimal"]),
             }
         )
