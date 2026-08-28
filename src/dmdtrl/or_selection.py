@@ -15,6 +15,7 @@ REQUIRED_SUMMARY_FIELDS = {
     "policy",
     "weighted_tardiness_mean",
     "mean_decision_time_ms_mean",
+    "solver_fallback_rate_mean",
     "cpsat_horizon",
     "solver_budget_ms",
     "pareto_optimal",
@@ -73,9 +74,12 @@ def select_operating_point(
     summary_rows: list[dict[str, Any]],
     *,
     quality_tolerance_pct: float = 2.0,
+    max_fallback_rate_pct: float = 1.0,
 ) -> dict[str, Any]:
     if quality_tolerance_pct < 0:
         raise ValueError("quality_tolerance_pct must be non-negative")
+    if not 0.0 <= max_fallback_rate_pct <= 100.0:
+        raise ValueError("max_fallback_rate_pct must be between 0 and 100")
     if not summary_rows:
         raise ValueError("sensitivity summary is empty")
 
@@ -86,17 +90,26 @@ def select_operating_point(
             raise ValueError(f"sensitivity summary is missing fields: {sorted(missing)}")
         weighted_tardiness = float(row["weighted_tardiness_mean"])
         latency = float(row["mean_decision_time_ms_mean"])
+        fallback_rate = float(row["solver_fallback_rate_mean"])
         solver_budget_ms = float(row["solver_budget_ms"])
         horizon = int(float(row["cpsat_horizon"]))
-        if not all(math.isfinite(value) for value in (weighted_tardiness, latency, solver_budget_ms)):
+        numeric_values = (weighted_tardiness, latency, fallback_rate, solver_budget_ms)
+        if not all(math.isfinite(value) for value in numeric_values):
             raise ValueError("sensitivity summary contains a non-finite numeric value")
-        if weighted_tardiness < 0 or latency < 0 or solver_budget_ms <= 0 or horizon <= 0:
+        if (
+            weighted_tardiness < 0
+            or latency < 0
+            or not 0.0 <= fallback_rate <= 1.0
+            or solver_budget_ms <= 0
+            or horizon <= 0
+        ):
             raise ValueError("sensitivity summary contains an invalid operational value")
         parsed.append(
             {
                 **row,
                 "weighted_tardiness_mean": weighted_tardiness,
                 "mean_decision_time_ms_mean": latency,
+                "solver_fallback_rate_mean": fallback_rate,
                 "cpsat_horizon": horizon,
                 "solver_budget_ms": solver_budget_ms,
                 "pareto_optimal": _as_bool(row["pareto_optimal"]),
@@ -107,10 +120,21 @@ def select_operating_point(
     if not pareto:
         raise ValueError("sensitivity summary has no Pareto-optimal configuration")
 
-    best_wtt = min(float(row["weighted_tardiness_mean"]) for row in pareto)
+    max_fallback_rate = max_fallback_rate_pct / 100.0
+    reliable_pareto = [
+        row for row in pareto if float(row["solver_fallback_rate_mean"]) <= max_fallback_rate + 1e-12
+    ]
+    if not reliable_pareto:
+        raise ValueError(
+            "no Pareto-optimal configuration satisfies the declared solver fallback-rate limit"
+        )
+
+    best_wtt = min(float(row["weighted_tardiness_mean"]) for row in reliable_pareto)
     threshold = best_wtt * (1.0 + quality_tolerance_pct / 100.0)
     acceptable = [
-        row for row in pareto if float(row["weighted_tardiness_mean"]) <= threshold + 1e-12
+        row
+        for row in reliable_pareto
+        if float(row["weighted_tardiness_mean"]) <= threshold + 1e-12
     ]
     if not acceptable:  # pragma: no cover - best WTT is always acceptable
         raise RuntimeError("selection rule produced no acceptable configuration")
@@ -120,6 +144,7 @@ def select_operating_point(
         key=lambda row: (
             float(row["mean_decision_time_ms_mean"]),
             float(row["weighted_tardiness_mean"]),
+            float(row["solver_fallback_rate_mean"]),
             float(row["solver_budget_ms"]),
             int(row["cpsat_horizon"]),
             str(row["policy"]),
@@ -132,10 +157,13 @@ def select_operating_point(
         "solver_seconds": float(selected["solver_budget_ms"]) / 1_000.0,
         "weighted_tardiness_mean": float(selected["weighted_tardiness_mean"]),
         "mean_decision_time_ms_mean": float(selected["mean_decision_time_ms_mean"]),
-        "best_pareto_weighted_tardiness_mean": best_wtt,
+        "solver_fallback_rate_mean": float(selected["solver_fallback_rate_mean"]),
+        "best_reliable_pareto_weighted_tardiness_mean": best_wtt,
         "quality_threshold_weighted_tardiness": threshold,
         "quality_tolerance_pct": float(quality_tolerance_pct),
+        "max_fallback_rate_pct": float(max_fallback_rate_pct),
         "acceptable_pareto_configurations": len(acceptable),
+        "reliable_pareto_configurations": len(reliable_pareto),
         "pareto_configurations": len(pareto),
     }
 
@@ -153,9 +181,10 @@ def build_freeze_manifest(
         "controller": "CP_SAT_RH",
         "status": "validation_selected",
         "selection_rule": (
-            "Among Pareto-optimal configurations within the declared percentage tolerance "
-            "of the best validation weighted tardiness, select the lowest measured mean "
-            "decision latency; break ties by WTT, solver budget, horizon, then policy name."
+            "Restrict to Pareto-optimal configurations satisfying the declared maximum "
+            "solver fallback rate. Within the declared WTT tolerance of the best reliable "
+            "Pareto point, select the lowest measured mean decision latency; break ties by "
+            "WTT, fallback rate, solver budget, horizon, then policy name."
         ),
         "validation_seed_start": seed_start,
         "validation_seed_count": seed_count,
@@ -175,6 +204,7 @@ def main() -> None:  # pragma: no cover - CLI exercised by workflow smoke/valida
     parser.add_argument("--summary-input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--quality-tolerance-pct", type=float, default=2.0)
+    parser.add_argument("--max-fallback-rate-pct", type=float, default=1.0)
     parser.add_argument("--validation-seed-start", type=int, default=10_000)
     parser.add_argument("--validation-seeds", type=int, default=30)
     args = parser.parse_args()
@@ -190,6 +220,7 @@ def main() -> None:  # pragma: no cover - CLI exercised by workflow smoke/valida
         selected = select_operating_point(
             summary_rows,
             quality_tolerance_pct=args.quality_tolerance_pct,
+            max_fallback_rate_pct=args.max_fallback_rate_pct,
         )
     except ValueError as exc:
         parser.error(str(exc))
@@ -209,7 +240,8 @@ def main() -> None:  # pragma: no cover - CLI exercised by workflow smoke/valida
         f"H={manifest['cpsat_horizon']} "
         f"budget={manifest['solver_budget_ms']:.1f} ms "
         f"validation WTT={manifest['weighted_tardiness_mean']:.3f} "
-        f"decision={manifest['mean_decision_time_ms_mean']:.3f} ms"
+        f"decision={manifest['mean_decision_time_ms_mean']:.3f} ms "
+        f"fallback={100.0 * manifest['solver_fallback_rate_mean']:.2f}%"
     )
     print(f"Freeze manifest saved to {args.output}")
 
