@@ -1,3 +1,6 @@
+# ruff: noqa: I001
+"""CLI orchestration with deliberate lazy imports for optional RL dependencies."""
+
 from __future__ import annotations
 
 import argparse
