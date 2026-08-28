@@ -142,9 +142,7 @@ class RollingHorizonCPSATPolicy:
                 arcs.append((0, node_index, first))
                 arcs.append((node_index, 0, last))
 
-                initial_setup = (
-                    0 if machine.last_family in (None, job.family) else setup_duration
-                )
+                initial_setup = 0 if machine.last_family in (None, job.family) else setup_duration
                 model.Add(start[job.job_id] >= now + initial_setup).OnlyEnforceIf(first)
                 if initial_setup:
                     setup_terms.append(initial_setup * first)
@@ -174,7 +172,9 @@ class RollingHorizonCPSATPolicy:
 
         weighted_tardiness = sum(job.priority * tardiness[job.job_id] for job in jobs)
         setup_cost = sum(setup_terms) if setup_terms else 0
-        model.Minimize(1_000 * weighted_tardiness + 10 * setup_cost + makespan)
+        max_secondary = 10 * setup_duration * len(jobs) + upper
+        primary_weight = max_secondary + 1
+        model.Minimize(primary_weight * weighted_tardiness + 10 * setup_cost + makespan)
 
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = self.config.time_limit_s
