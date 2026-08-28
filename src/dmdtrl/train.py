@@ -119,9 +119,13 @@ def build_training_manifest(
             },
         },
         "evaluation_seed_convention": {
+            "validation_seed_start": 10_000,
             "nominal_test_seed_start": 20_000,
             "stress_test_seed_start": 30_000,
-            "note": "Evaluation seeds must remain disjoint from model-selection/training randomness.",
+            "note": (
+                "Validation/model-selection seeds and final-test seeds must remain disjoint from "
+                "training randomness and from one another."
+            ),
         },
     }
 
