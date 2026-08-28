@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dynamic-manufacturing-digital-twin-rl"
-version = "0.10.0"
+version = "0.9.0"
 description = "A research-grade dynamic manufacturing digital twin for reinforcement-learning scheduling and OR benchmarking."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,7 +41,6 @@ dmdtrl-or = "dmdtrl.or_benchmark:main"
 dmdtrl-or-sensitivity = "dmdtrl.or_sensitivity:main"
 dmdtrl-or-select = "dmdtrl.or_selection:main"
 dmdtrl-ppo-campaign = "dmdtrl.ppo_campaign:main"
-dmdtrl-final-campaign = "dmdtrl.final_campaign:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
