@@ -10,11 +10,11 @@ The repository implements an event-driven manufacturing digital twin and formula
 
 > Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and, later, rolling-horizon OR methods?
 
-The project is intentionally structured around **benchmarking, stress testing, and statistical validation**, not training reward alone.
+The project is intentionally structured around **benchmarking, stress testing, reproducible training, and statistical validation**, not training reward alone.
 
-## Current v0.3 scope
+## Current v0.4 scope
 
-The digital twin includes:
+The digital twin and research harness include:
 
 - stochastic job arrivals;
 - heterogeneous parallel machines;
@@ -25,7 +25,10 @@ The digital twin includes:
 - event-driven scheduling decisions;
 - fourteen bounded operational state features;
 - eight deterministic dispatching rules;
-- PPO training and deterministic model-evaluation adapters;
+- PPO hyper-heuristic training;
+- machine-readable PPO training manifests;
+- explicit nominal/stress test seed separation;
+- deterministic learned-policy evaluation adapters;
 - common-random-number experiments;
 - raw seed-level KPI output;
 - bootstrap confidence intervals;
@@ -34,7 +37,7 @@ The digital twin includes:
 - online decision-latency measurement;
 - controlled distribution-shift scenarios;
 - compound operational stress testing;
-- automated unit tests and GitHub Actions CI.
+- lightweight multi-version CI plus a separate real RL integration workflow.
 
 ## RL formulation
 
@@ -126,32 +129,37 @@ ruff check src tests
 
 ## Benchmark fixed dispatching rules
 
-The compact baseline command remains available:
-
 ```bash
 dmdtrl-baselines --seeds 30 --output results/baselines.csv
 ```
 
-## Research-grade experiment harness
-
-Run all eight fixed policies on common random seeds and retain seed-level results plus bootstrap confidence intervals:
+## Train PPO with an audit manifest
 
 ```bash
-dmdtrl-research \
-  --seeds 50 \
-  --raw-output results/research_runs.csv \
-  --summary-output results/research_summary.csv
+dmdtrl-train \
+  --steps 150000 \
+  --seed 42 \
+  --output models/ppo_dispatcher \
+  --metadata models/ppo_dispatcher_manifest.json \
+  --device cpu
 ```
 
-After training PPO, run paired PPO-vs-baseline comparisons on the same stochastic scenarios:
+The command writes the Stable-Baselines3 model and a JSON manifest containing the full PPO configuration, `EnvConfig`, training time, GitHub run metadata when available, Python/platform information, and package versions.
+
+See [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md) for the experiment contract.
+
+## Research-grade nominal evaluation
+
+Nominal final-test seeds default to the disjoint `20000+` range:
 
 ```bash
 dmdtrl-research \
   --model models/ppo_dispatcher.zip \
   --seeds 100 \
-  --raw-output results/research_runs.csv \
-  --summary-output results/research_summary.csv \
-  --comparisons-output results/ppo_comparisons.csv
+  --seed-start 20000 \
+  --raw-output results/nominal_runs.csv \
+  --summary-output results/nominal_summary.csv \
+  --comparisons-output results/nominal_ppo_comparisons.csv
 ```
 
 For every candidate-vs-baseline KPI comparison, the harness reports:
@@ -167,7 +175,7 @@ For every candidate-vs-baseline KPI comparison, the harness reports:
 
 ## Distribution-shift stress testing
 
-The stress suite evaluates the same policies on controlled out-of-distribution operating conditions. Built-in scenarios include:
+Stress seeds default to a separate `30000+` range. Built-in scenarios include:
 
 - nominal conditions;
 - +20%, +40%, and +60% arrival intensity;
@@ -177,52 +185,36 @@ The stress suite evaluates the same policies on controlled out-of-distribution o
 - 2x sequence-dependent setup time;
 - a compound severe scenario combining demand, failure, due-date, speed, and setup pressure.
 
-Run the full stress matrix on fixed policies:
-
-```bash
-dmdtrl-stress \
-  --seeds 30 \
-  --seed-start 30000 \
-  --raw-output results/stress_runs.csv \
-  --summary-output results/stress_summary.csv
-```
-
-Run selected scenarios only:
-
-```bash
-dmdtrl-stress \
-  --scenario nominal \
-  --scenario demand_140 \
-  --scenario compound_stress \
-  --seeds 50
-```
-
-After PPO training, add the learned policy to the same paired stress tests:
-
 ```bash
 dmdtrl-stress \
   --model models/ppo_dispatcher.zip \
   --seeds 100 \
   --seed-start 30000 \
+  --raw-output results/stress_runs.csv \
+  --summary-output results/stress_summary.csv \
   --comparisons-output results/stress_ppo_comparisons.csv
 ```
 
-The objective is to estimate a **robustness profile**, not merely one nominal test score: how quickly each policy degrades as demand, failures, due-date pressure, and processing capacity move away from training-like conditions.
+The PPO model is evaluated without retraining. The objective is a **robustness profile**, not one calibrated leaderboard score.
 
-## Train PPO
+## GitHub Actions
 
-```bash
-dmdtrl-train --steps 150000 --seed 42 --output models/ppo_dispatcher
-```
+Two workflows serve different purposes:
 
-The trained Stable-Baselines3 model is saved as `models/ppo_dispatcher.zip`.
+- `CI` — Python 3.10/3.11/3.12 lint, unit/integration tests, coverage, research/stress CLI smoke tests without installing PyTorch;
+- `RL Smoke` — Python 3.11 with Stable-Baselines3/PyTorch, short PPO training, nominal learned-policy evaluation, distribution-shift evaluation, manifest validation, and uploaded experiment artifacts.
+
+The short model generated by `RL Smoke` is only an integration test and must not be interpreted as evidence that PPO is operationally superior.
 
 ## Repository structure
 
 ```text
 .
-├── .github/workflows/ci.yml
+├── .github/workflows/
+│   ├── ci.yml
+│   └── rl-smoke.yml
 ├── docs/
+│   ├── ppo_reproducibility.md
 │   ├── research_protocol.md
 │   ├── roadmap.md
 │   └── stress_scenarios.md
@@ -252,7 +244,7 @@ Complete. Event logic, dispatching rules, reproducibility tests, and baseline be
 
 ### Phase 2 — PPO hyper-heuristic + statistical validation
 
-Current phase. Evaluate PPO out-of-sample against every fixed dispatching rule using paired stochastic seeds, confidence intervals, effect sizes, and decision latency.
+Current phase. Reproducible training, manifest generation, nominal/stress seed separation, learned-policy adapters, and paired statistical evaluation infrastructure are implemented. The next scientific step is a multi-training-seed PPO study with a sufficiently long training budget.
 
 ### Phase 3 — rolling-horizon optimization
 
@@ -260,7 +252,7 @@ Add CP-SAT / MILP scheduling baselines and compare solution quality, compute tim
 
 ### Phase 4 — generalization study
 
-Stress-test infrastructure is implemented. The next step is to train candidate policies only on nominal conditions and evaluate them without retraining across the predefined distribution-shift matrix.
+Stress-test infrastructure is implemented. Candidate policies trained only on nominal conditions will be evaluated without retraining across the predefined distribution-shift matrix.
 
 The key scientific output will be the relationship between uncertainty/disruption level and the relative advantage of adaptive policies.
 
@@ -274,7 +266,7 @@ Expose current twin state and recommended actions through an API/dashboard suita
 
 ## Scientific protocol
 
-See [`docs/research_protocol.md`](docs/research_protocol.md) for predeclared evaluation standards, [`docs/stress_scenarios.md`](docs/stress_scenarios.md) for the OOD scenario definitions, and [`docs/roadmap.md`](docs/roadmap.md) for the phased research plan.
+See [`docs/research_protocol.md`](docs/research_protocol.md), [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md), [`docs/stress_scenarios.md`](docs/stress_scenarios.md), and [`docs/roadmap.md`](docs/roadmap.md).
 
 A learned policy should not be described as superior merely because training reward increases. If a classical OR or dispatching policy is faster, more robust, or operationally better, that is a valid and useful research result.
 
