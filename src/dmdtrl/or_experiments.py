@@ -18,11 +18,15 @@ def run_cpsat_policy(
     env.reset(seed=seed)
     terminated = False
     decision_times: list[float] = []
+    fallback_decisions = 0
+    total_decisions = 0
 
     while not terminated:
         started = perf_counter()
         decision = policy.choose(env)
         decision_times.append(perf_counter() - started)
+        total_decisions += 1
+        fallback_decisions += int(decision.used_fallback)
 
         _, _, terminated, truncated, _ = env.step_assignment(
             decision.job_id,
@@ -32,11 +36,16 @@ def run_cpsat_policy(
         if truncated:
             break
 
+    fallback_rate = fallback_decisions / total_decisions if total_decisions else 0.0
     return {
         "policy": policy.name,
         "seed": seed,
         **env.metrics(),
         "mean_decision_time_ms": 1_000.0 * mean(decision_times) if decision_times else 0.0,
+        "solver_fallback_decisions": fallback_decisions,
+        "solver_total_decisions": total_decisions,
+        "solver_fallback_rate": fallback_rate,
+        "solver_success_rate": 1.0 - fallback_rate,
     }
 
 
