@@ -4,15 +4,17 @@ A research-oriented industrial engineering / operations research project for **d
 
 The repository implements an event-driven manufacturing digital twin and formulates real-time dispatching as a reinforcement-learning hyper-heuristic. Instead of assigning an RL action to every `(job, machine)` pair, the agent selects a dispatching policy at each decision epoch. This keeps the action space fixed while allowing the policy to adapt to stochastic arrivals, heterogeneous machines, sequence-dependent setups, due-date pressure, and random breakdowns.
 
+A rolling-horizon CP-SAT controller provides a classical operations-research comparator using the same simulator transitions and online information boundary.
+
 > Current model scope: dynamic heterogeneous parallel-machine scheduling. It is not yet a full job-shop or flexible job-shop model; multi-operation routing and precedence constraints are a later research phase.
 
 ## Research question
 
-> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and, later, rolling-horizon OR methods?
+> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and rolling-horizon optimization?
 
-The project is intentionally structured around **benchmarking, stress testing, reproducible training, and statistical validation**, not training reward alone.
+The project is intentionally structured around **benchmarking, stress testing, reproducible training, OR comparison, and statistical validation**, not training reward alone.
 
-## Current v0.4 scope
+## Current v0.5 scope
 
 The digital twin and research harness include:
 
@@ -29,6 +31,9 @@ The digital twin and research harness include:
 - machine-readable PPO training manifests;
 - explicit nominal/stress test seed separation;
 - deterministic learned-policy evaluation adapters;
+- rolling-horizon CP-SAT job-machine optimization;
+- released-job-only OR information boundaries;
+- sequence-dependent setup transitions inside the CP-SAT plan;
 - common-random-number experiments;
 - raw seed-level KPI output;
 - bootstrap confidence intervals;
@@ -37,7 +42,7 @@ The digital twin and research harness include:
 - online decision-latency measurement;
 - controlled distribution-shift scenarios;
 - compound operational stress testing;
-- lightweight multi-version CI plus a separate real RL integration workflow.
+- multi-version CI plus a separate real RL integration workflow.
 
 ## RL formulation
 
@@ -120,6 +125,12 @@ For PPO training/evaluation:
 pip install -e ".[rl,dev,analysis]"
 ```
 
+For rolling-horizon CP-SAT benchmarking:
+
+```bash
+pip install -e ".[or,dev,analysis]"
+```
+
 ## Run the tests
 
 ```bash
@@ -173,6 +184,27 @@ For every candidate-vs-baseline KPI comparison, the harness reports:
 - probability of superiority;
 - number of paired stochastic seeds.
 
+## Rolling-horizon CP-SAT benchmark
+
+The OR controller sees only jobs that have already been released and machines that are currently available. It does not inspect future arrivals or future breakdown realizations.
+
+At every decision epoch it builds a bounded CP-SAT plan, models heterogeneous machine processing times and sequence-dependent family setups, executes only the first assignment, and replans.
+
+```bash
+dmdtrl-or \
+  --seeds 30 \
+  --seed-start 20000 \
+  --horizon 12 \
+  --solver-seconds 0.10 \
+  --raw-output results/or_runs.csv \
+  --summary-output results/or_summary.csv \
+  --comparisons-output results/cpsat_comparisons.csv
+```
+
+The benchmark uses the same seed-level KPI schema and paired statistical comparison machinery as the PPO research harness. Online solve latency is included as a first-class metric.
+
+See [`docs/or_baseline.md`](docs/or_baseline.md) for the information boundary, CP-SAT formulation, objective hierarchy, and current limitations.
+
 ## Distribution-shift stress testing
 
 Stress seeds default to a separate `30000+` range. Built-in scenarios include:
@@ -195,13 +227,13 @@ dmdtrl-stress \
   --comparisons-output results/stress_ppo_comparisons.csv
 ```
 
-The PPO model is evaluated without retraining. The objective is a **robustness profile**, not one calibrated leaderboard score.
+The PPO model is evaluated without retraining. The objective is a **robustness profile**, not one calibrated leaderboard score. CP-SAT integration into the same stress matrix is the next Phase 3 milestone.
 
 ## GitHub Actions
 
 Two workflows serve different purposes:
 
-- `CI` — Python 3.10/3.11/3.12 lint, unit/integration tests, coverage, research/stress CLI smoke tests without installing PyTorch;
+- `CI` — Python 3.10/3.11/3.12 lint, unit/integration tests, coverage, research/stress/CP-SAT CLI smoke tests;
 - `RL Smoke` — Python 3.11 with Stable-Baselines3/PyTorch, short PPO training, nominal learned-policy evaluation, distribution-shift evaluation, manifest validation, and uploaded experiment artifacts.
 
 The short model generated by `RL Smoke` is only an integration test and must not be interpreted as evidence that PPO is operationally superior.
@@ -214,6 +246,7 @@ The short model generated by `RL Smoke` is only an integration test and must not
 │   ├── ci.yml
 │   └── rl-smoke.yml
 ├── docs/
+│   ├── or_baseline.md
 │   ├── ppo_reproducibility.md
 │   ├── research_protocol.md
 │   ├── roadmap.md
@@ -225,6 +258,9 @@ The short model generated by `RL Smoke` is only an integration test and must not
 │   ├── experiments.py
 │   ├── generator.py
 │   ├── models.py
+│   ├── or_benchmark.py
+│   ├── or_experiments.py
+│   ├── or_policy.py
 │   ├── policies.py
 │   ├── research.py
 │   ├── scenarios.py
@@ -244,17 +280,19 @@ Complete. Event logic, dispatching rules, reproducibility tests, and baseline be
 
 ### Phase 2 — PPO hyper-heuristic + statistical validation
 
-Current phase. Reproducible training, manifest generation, nominal/stress seed separation, learned-policy adapters, and paired statistical evaluation infrastructure are implemented. The next scientific step is a multi-training-seed PPO study with a sufficiently long training budget.
+Infrastructure is complete. Reproducible training, manifest generation, nominal/stress seed separation, learned-policy adapters, and paired statistical evaluation are implemented. The remaining scientific milestone is a sufficiently long multi-training-seed PPO study.
 
 ### Phase 3 — rolling-horizon optimization
 
-Add CP-SAT / MILP scheduling baselines and compare solution quality, compute time, and robustness under disturbances.
+In progress. The first CP-SAT baseline now performs online released-job planning with explicit job-machine assignments, sequence-dependent setup transitions, bounded solve time, and paired nominal evaluation against the eight fixed rules.
+
+Next: integrate CP-SAT into the distribution-shift suite and run matched PPO vs CP-SAT vs fixed-rule comparisons.
 
 ### Phase 4 — generalization study
 
 Stress-test infrastructure is implemented. Candidate policies trained only on nominal conditions will be evaluated without retraining across the predefined distribution-shift matrix.
 
-The key scientific output will be the relationship between uncertainty/disruption level and the relative advantage of adaptive policies.
+The key scientific output will be the relationship between uncertainty/disruption level and the relative advantage of adaptive and optimization-based policies.
 
 ### Phase 5 — true flexible job-shop extension
 
@@ -266,7 +304,7 @@ Expose current twin state and recommended actions through an API/dashboard suita
 
 ## Scientific protocol
 
-See [`docs/research_protocol.md`](docs/research_protocol.md), [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md), [`docs/stress_scenarios.md`](docs/stress_scenarios.md), and [`docs/roadmap.md`](docs/roadmap.md).
+See [`docs/research_protocol.md`](docs/research_protocol.md), [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md), [`docs/or_baseline.md`](docs/or_baseline.md), [`docs/stress_scenarios.md`](docs/stress_scenarios.md), and [`docs/roadmap.md`](docs/roadmap.md).
 
 A learned policy should not be described as superior merely because training reward increases. If a classical OR or dispatching policy is faster, more robust, or operationally better, that is a valid and useful research result.
 
