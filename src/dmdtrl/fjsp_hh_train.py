@@ -93,15 +93,16 @@ def validate_operator_contract(
 ) -> dict[str, int]:
     env.reset(seed=seed)
     decisions = 0
+    operator_count = int(env.action_space.n)
     while True:
         mask = env.action_masks()
-        if mask.shape != (env.action_space.n,):
+        if mask.shape != (operator_count,):
             raise RuntimeError("operator mask shape does not match action space")
         if not bool(mask.all()):
             if env.simulator is not None and env.simulator.terminated:
                 break
             raise RuntimeError("all hyper-heuristic operators must be feasible")
-        action = decisions % env.action_space.n
+        action = decisions % operator_count
         _, _, terminated, truncated, _ = env.step(action)
         decisions += 1
         if truncated:
@@ -110,7 +111,7 @@ def validate_operator_contract(
             break
     return {
         "validated_decisions": decisions,
-        "operator_action_count": env.action_space.n,
+        "operator_action_count": operator_count,
     }
 
 
