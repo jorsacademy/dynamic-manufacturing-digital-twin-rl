@@ -37,7 +37,7 @@ def test_committed_design_is_valid_and_predeclared() -> None:
         (("training_config", "total_timesteps"), 149_999, "150000"),
         (("validation_seed_start",), 41_100, "overlap|41200"),
         (("validation_seed_count",), 29, "30 seeds"),
-        (("final_test_seed_start",), 41_230, "42000|overlap"),
+        (("final_test_seed_start",), 41_230, "100 seeds|42000|overlap"),
         (("frozen_cpsat_policy",), "OTHER", "CP-SAT"),
         (("selection_data_boundary", "final_test_used_for_selection"), True, "embargoed"),
         (("hyperparameter_selection", "search_performed_on_validation_block"), True, "forbidden"),
