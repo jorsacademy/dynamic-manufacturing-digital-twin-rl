@@ -94,3 +94,17 @@ jobs:
           --raw-output /tmp/or_sensitivity_runs.csv
           --summary-output /tmp/or_sensitivity_summary.csv
           --comparisons-output /tmp/or_sensitivity_comparisons.csv
+
+      - name: Phase-5 FJSP CP-SAT smoke test
+        if: matrix.python-version == '3.11'
+        run: >-
+          python -m dmdtrl.fjsp_or_benchmark
+          --seeds 1
+          --seed-start 40000
+          --jobs 4
+          --machines 3
+          --job-horizon 4
+          --solver-seconds 0.10
+          --setup-time 0.5
+          --raw-output /tmp/fjsp_or_runs.csv
+          --summary-output /tmp/fjsp_or_summary.csv
