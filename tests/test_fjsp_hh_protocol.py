@@ -12,6 +12,7 @@ from dmdtrl.fjsp_hh_protocol import (
 from dmdtrl.fjsp_operators import OPERATOR_NAMES
 
 
+
 DESIGN_PATH = Path("configs/fjsp_hh_validation_design.json")
 
 
