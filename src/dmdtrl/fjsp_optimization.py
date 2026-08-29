@@ -58,13 +58,13 @@ class FJSPRollingHorizonCPSAT:
         if not eligible_now:
             raise RuntimeError("simulator has no eligible action at the decision epoch")
 
-        candidate_jobs = self._candidate_jobs(simulator)
+        candidate_jobs = self._candidate_jobs(simulator, eligible_now)
         candidate_ids = tuple(job.job_id for job in candidate_jobs)
         candidate_id_set = set(candidate_ids)
         eligible_now = tuple(
             action for action in eligible_now if action.job_id in candidate_id_set
         )
-        if not eligible_now:
+        if not eligible_now:  # pragma: no cover - guaranteed by _candidate_jobs
             raise RuntimeError("candidate horizon excluded every currently feasible action")
 
         decision = self._solve(simulator, candidate_jobs, eligible_now)
@@ -86,7 +86,12 @@ class FJSPRollingHorizonCPSAT:
             "solver_success_rate": 1.0 - fallback_rate,
         }
 
-    def _candidate_jobs(self, simulator: FlexibleJobShopSimulator):
+    def _candidate_jobs(
+        self,
+        simulator: FlexibleJobShopSimulator,
+        eligible_now: tuple[FJSPAction, ...] | list[FJSPAction] = (),
+    ):
+        feasible_job_ids = {action.job_id for action in eligible_now}
         released = [
             job
             for job in simulator.instance.jobs
@@ -95,6 +100,7 @@ class FJSPRollingHorizonCPSAT:
         ]
         released.sort(
             key=lambda job: (
+                job.job_id not in feasible_job_ids,
                 (job.due_date - simulator.current_time) / max(job.priority, 1),
                 job.due_date,
                 -job.priority,
