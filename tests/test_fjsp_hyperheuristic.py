@@ -6,7 +6,7 @@ import pytest
 from dmdtrl.fjsp_env import FJSPEnvConfig, FlexibleJobShopEnv
 from dmdtrl.fjsp_generator import FJSPGeneratorConfig
 from dmdtrl.fjsp_hyperheuristic_env import FlexibleJobShopHyperHeuristicEnv
-from dmdtrl.fjsp_operators import FJSPOperator, OPERATOR_NAMES, select_operator_action
+from dmdtrl.fjsp_operators import OPERATOR_NAMES, FJSPOperator, select_operator_action
 
 
 def _config() -> FJSPEnvConfig:
