@@ -7,7 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from dmdtrl.fjsp_env import FJSPEnvConfig, FlexibleJobShopEnv
-from dmdtrl.fjsp_operators import FJSPOperator, OPERATOR_NAMES, select_operator_action
+from dmdtrl.fjsp_operators import OPERATOR_NAMES, FJSPOperator, select_operator_action
 from dmdtrl.fjsp_simulator import FlexibleJobShopSimulator
 
 
