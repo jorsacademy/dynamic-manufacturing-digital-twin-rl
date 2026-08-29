@@ -17,7 +17,7 @@ from dmdtrl.fjsp_generator import FJSPGeneratorConfig, generate_fjsp_instance
 from dmdtrl.fjsp_hh_evaluate import _run_cpsat, _run_operator
 from dmdtrl.fjsp_hh_protocol import load_hh_validation_design
 from dmdtrl.fjsp_hh_train import FJSPHyperHeuristicPPOConfig
-from dmdtrl.fjsp_operators import FJSPOperator, OPERATOR_NAMES
+from dmdtrl.fjsp_operators import OPERATOR_NAMES, FJSPOperator
 from dmdtrl.fjsp_optimization import FJSPCPSATConfig
 from dmdtrl.fjsp_ppo_campaign import (
     aggregate_member_metrics,
