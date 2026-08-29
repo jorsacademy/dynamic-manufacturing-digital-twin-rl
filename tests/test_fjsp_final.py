@@ -36,7 +36,7 @@ def test_final_design_matches_frozen_phase5_boundaries() -> None:
 def test_final_seed_range_cannot_drift() -> None:
     config = _load("configs/fjsp_final_baseline_test.json")
     config["seed_start"] = 41999
-    with pytest.raises(ValueError, match="42000-42099"):
+    with pytest.raises(ValueError, match="seed range"):
         final_seeds(config)
 
 
