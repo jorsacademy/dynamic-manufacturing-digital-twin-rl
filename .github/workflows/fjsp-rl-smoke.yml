@@ -1,0 +1,159 @@
+name: FJSP RL Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/fjsp-rl-smoke.yml"
+      - "src/dmdtrl/fjsp_train.py"
+      - "src/dmdtrl/fjsp_env.py"
+      - "src/dmdtrl/fjsp_generator.py"
+      - "src/dmdtrl/fjsp_models.py"
+      - "src/dmdtrl/fjsp_simulator.py"
+      - "tests/test_fjsp_train.py"
+
+permissions:
+  contents: read
+
+jobs:
+  maskable-ppo-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Phase-5 RL dependencies
+        run: >-
+          python -m pip install --upgrade pip &&
+          pip install -e ".[dev]" &&
+          pip install "sb3-contrib>=2.9,<3"
+
+      - name: Validate FJSP training contracts
+        run: pytest tests/test_fjsp_train.py tests/test_fjsp_env.py tests/test_fjsp_core.py
+
+      - name: Train real Maskable PPO smoke model
+        run: >-
+          python -m dmdtrl.fjsp_train
+          --steps 4096
+          --seed 601
+          --n-steps 256
+          --batch-size 64
+          --jobs 6
+          --machines 3
+          --operations-min 2
+          --operations-max 3
+          --eligible-max 2
+          --setup-time 0.5
+          --output artifacts/fjsp_maskable_ppo
+          --metadata artifacts/fjsp_maskable_manifest.json
+          --device cpu
+          --quiet
+
+      - name: Run masked deterministic inference
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          import numpy as np
+          from sb3_contrib import MaskablePPO
+
+          from dmdtrl.fjsp_env import FJSPEnvConfig, FlexibleJobShopEnv
+          from dmdtrl.fjsp_generator import FJSPGeneratorConfig
+
+          env_config = FJSPEnvConfig(
+              generator=FJSPGeneratorConfig(
+                  n_jobs=6,
+                  n_machines=3,
+                  n_families=4,
+                  operations_min=2,
+                  operations_max=3,
+                  eligible_machines_min=1,
+                  eligible_machines_max=2,
+              ),
+              default_setup_time=0.5,
+          )
+          model = MaskablePPO.load("artifacts/fjsp_maskable_ppo.zip", device="cpu")
+          results = []
+          for seed in (40010, 40011):
+              env = FlexibleJobShopEnv(env_config)
+              observation, _ = env.reset(seed=seed)
+              terminated = False
+              while not terminated:
+                  mask = env.action_masks()
+                  assert bool(mask.any())
+                  action, _ = model.predict(
+                      observation,
+                      action_masks=mask,
+                      deterministic=True,
+                  )
+                  action_id = int(np.asarray(action).item())
+                  assert bool(mask[action_id])
+                  observation, _, terminated, truncated, _ = env.step(action_id)
+                  assert not truncated
+              metrics = env.simulator.metrics()
+              trace = env.decision_trace_records()
+              assert len(trace) == int(metrics["scheduled_operations"])
+              results.append(
+                  {
+                      "seed": seed,
+                      "weighted_tardiness": metrics["weighted_tardiness"],
+                      "makespan": metrics["makespan"],
+                      "decisions": len(trace),
+                      "unique_actions": len({int(row["action_id"]) for row in trace}),
+                      "mean_feasible_actions": float(
+                          np.mean([int(row["feasible_action_count"]) for row in trace])
+                      ),
+                  }
+              )
+              env.close()
+
+          Path("artifacts/fjsp_masked_inference.json").write_text(
+              json.dumps(results, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Verify model and manifest provenance
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("artifacts")
+          model = root / "fjsp_maskable_ppo.zip"
+          manifest_path = root / "fjsp_maskable_manifest.json"
+          inference_path = root / "fjsp_masked_inference.json"
+          assert model.stat().st_size > 0
+          manifest = json.loads(manifest_path.read_text())
+          assert manifest["algorithm"] == "MaskablePPO"
+          assert manifest["training_seed"] == 601
+          assert manifest["training_config"]["total_timesteps"] == 4096
+          assert manifest["mask_contract"]["validated_decisions"] > 0
+          assert manifest["runtime"]["sb3_contrib"] != "not-installed"
+          assert manifest["runtime"]["stable_baselines3"] != "not-installed"
+          results = json.loads(inference_path.read_text())
+          assert [row["seed"] for row in results] == [40010, 40011]
+          assert all(row["decisions"] > 0 for row in results)
+          PY
+
+      - name: Show smoke artifacts
+        run: |
+          cat artifacts/fjsp_maskable_manifest.json
+          cat artifacts/fjsp_masked_inference.json
+
+      - name: Upload FJSP Maskable PPO smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fjsp-maskable-ppo-smoke-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
