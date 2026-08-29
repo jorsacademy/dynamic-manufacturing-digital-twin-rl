@@ -98,31 +98,48 @@ Evidence:
 
 ## Phase 5 — True flexible job-shop and stronger adaptivity test
 
-Status: **next manufacturing research phase.**
+Status: **in progress.**
 
-The current environment is a dynamic heterogeneous parallel-machine model. The next extension should introduce structural reasons for adaptive decision-making rather than retune PPO against locked final seeds.
+The current validated v1.0 environment remains the locked dynamic heterogeneous parallel-machine model. Phase 5 is being built as a separate FJSP core so the Phase-4 result remains reproducible while the scheduling structure becomes materially richer.
 
-Planned model upgrades:
+Delivered in the first Phase-5 increment:
 
-- multi-operation jobs;
-- precedence constraints;
+- multi-operation jobs with explicit ordered operation chains;
+- strict precedence enforcement;
 - alternative eligible machines per operation;
-- operation-dependent processing times;
-- routing decisions;
-- dynamic feasible action sets;
+- operation- and machine-dependent processing times;
+- dynamic job release times;
+- explicit `(job, operation, machine)` assignment actions;
+- event-driven advancement to the next feasible decision epoch;
+- family-dependent sequence setup support, including optional family-to-family setup maps;
+- reproducible stochastic FJSP instance generation;
+- operation-level schedules and job-level tardiness/flow-time metrics;
+- deterministic shortest-processing and earliest-due-date feasibility baselines;
+- tests for precedence, eligibility, releases, setups, reproducibility, and full-instance completion.
+
+See `docs/fjsp_core.md`.
+
+Next Phase-5 increment:
+
+- Gymnasium-compatible FJSP decision environment;
+- fixed-capacity action indexing with an explicit dynamic feasibility mask;
+- action/rule-selection trace logging and policy-entropy diagnostics;
+- a Phase-5 seed partition separate from the locked Phase-4 final seeds.
+
+Subsequent model upgrades:
+
 - richer family-to-family setup matrices;
 - urgent-order bursts;
 - explicitly pre-generated exogenous disruption plans;
 - explicit physical completion events and completion-timed reward/KPI accounting;
 - productive-utilization versus occupancy separation.
 
-Planned RL/diagnostic upgrades:
+Subsequent algorithm/baseline upgrades:
 
-- action/rule-selection trace logging;
-- policy entropy and heuristic-switching diagnostics;
 - action-masked PPO for dynamic feasibility;
-- graph/attention state encoders if the FJSP structure warrants them;
-- comparison with strong rolling-horizon OR and neighborhood-search baselines.
+- FJSP rolling-horizon CP-SAT / interval scheduling;
+- strong neighborhood-search or ALNS-style baselines;
+- graph/attention state encoders only if the FJSP structure warrants them.
 
 The locked Phase-4 final seeds remain untouched. Phase 5 receives new development/validation/final seed partitions.
 
