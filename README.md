@@ -1,113 +1,160 @@
-# Dynamic Manufacturing Digital Twin with Reinforcement Learning
+# Dynamic Manufacturing Decision Twin — OR, RL & Flexible Job Shop Scheduling
 
-A research-oriented industrial engineering / operations research project for **dynamic production scheduling under uncertainty**.
+**Status: COMPLETE — portfolio-ready research project.**
 
-The repository implements an event-driven manufacturing digital twin and compares eight fixed dispatching rules, a multi-seed PPO hyper-heuristic, and rolling-horizon CP-SAT optimization on common stochastic realizations.
+A research-grade Industrial Engineering / Operations Research project that combines an event-driven manufacturing digital twin, flexible job-shop scheduling, rolling-horizon mathematical optimization, reinforcement learning experiments, and controlled statistical validation.
 
-> Current scope: dynamic heterogeneous parallel-machine scheduling. A true flexible job-shop representation with multi-operation routing and precedence constraints is the next manufacturing research extension.
+The repository is intentionally evidence-driven rather than "AI-first": two RL formulations were implemented and rejected at independent validation gates, while a frozen rolling-horizon CP-SAT controller won the final true-FJSP benchmark.
 
-## Research question
+## Final result
 
-> Under what levels of demand variability and operational disruption does an adaptive RL hyper-heuristic provide material value over fixed dispatching rules and rolling-horizon optimization, after accounting for online decision latency, solver reliability, and RL training-seed variability?
+The closing Phase-5 benchmark used **100 previously untouched FJSP instances (`42000–42099`)** and exactly nine frozen non-RL controllers. All controllers saw the same canonical instance for each seed. No controller was retuned after final-test access.
 
-The repository is built around reproducibility, paired benchmarking, model-selection discipline, disjoint validation/final-test data, and willingness to report a negative RL result.
+| Rank | Controller | Mean weighted tardiness | 95% bootstrap CI | Mean decision latency |
+| ---: | --- | ---: | ---: | ---: |
+| 1 | **Rolling-Horizon CP-SAT** | **23.4672** | **[19.9513, 27.1294]** | 23.4933 ms |
+| 2 | Minimum Slack | 30.4134 | [25.4342, 35.7992] | 0.0139 ms |
+| 3 | Earliest Due Date | 32.4370 | [27.0884, 38.4064] | 0.0090 ms |
+| 4 | Critical Ratio | 36.5716 | [31.6531, 41.8447] | 0.0143 ms |
+| 5 | Weighted Tardiness Risk | 37.0807 | [31.0336, 43.4308] | 0.0137 ms |
+| 6 | Highest Priority | 43.1420 | [38.6059, 47.8443] | 0.0100 ms |
+| 7 | Shortest Processing | 57.3151 | [51.2552, 63.6600] | 0.0097 ms |
+| 8 | Same Family First | 74.2901 | [66.9821, 81.8338] | 0.0106 ms |
+| 9 | Minimum Setup | 75.1594 | [67.6542, 82.6470] | 0.0101 ms |
 
-## Current v1.0 status
+Against the strongest fixed heuristic, **Minimum Slack**, frozen CP-SAT reduced mean weighted tardiness by **22.84%** (`6.9462` WTT units), with paired 95% CI **[2.7670, 11.4262]**, paired randomization **p = 0.0008**, `n = 100`, and **0.0 fallback rate**.
 
-The complete nominal + distribution-shift comparative campaign is finished.
+The trade-off is computational: CP-SAT uses about **23.49 ms per online decision**, while Minimum Slack uses about **0.014 ms**. The operational recommendation is therefore conditional rather than universal:
 
-Research infrastructure includes:
+- use CP-SAT when weighted tardiness is the dominant KPI and a ~20–25 ms decision budget is acceptable;
+- use Minimum Slack when effectively instantaneous decisions and minimal infrastructure are more important than the observed WTT gap.
 
-- stochastic arrivals, heterogeneous machines, sequence-dependent setups, breakdown/repair delays, priorities, due dates, and quality risk;
-- fourteen normalized operational state features and eight deterministic dispatching rules;
-- PPO hyper-heuristic training with reproducibility manifests;
-- rolling-horizon CP-SAT with released-job-only information and explicit job-machine assignments;
-- deterministic CP-SAT timeout fallback plus measured solver reliability;
-- CP-SAT horizon × solve-budget sensitivity analysis and a frozen operating point;
-- five independent 150,000-timestep PPO training runs and frozen model hashes;
-- independent artifact/hash verification for both adaptive controller families;
-- 100-seed nominal and 100-seed-per-scenario final evaluation across nine OOD stress regimes;
-- hierarchical bootstrap over PPO training-seed and environment-seed uncertainty;
-- paired randomization tests, effect sizes, probability of superiority, and Holm correction;
-- Python 3.10/3.11/3.12 CI plus RL, OR-validation, PPO-validation, and final-comparison workflows.
+Full scientific narrative: [`docs/final_project_report.md`](docs/final_project_report.md).
 
-Seed regimes are deliberately separated:
+Machine-readable completion evidence: [`configs/project_completion.json`](configs/project_completion.json).
 
-- training randomness: below `10000`;
-- validation/model selection: `10000–19999`;
-- nominal final test: `20000–20099`;
-- stress final test: `30000–30099`.
+## What was built
 
-## Final comparative conclusion
+### 1. Event-driven manufacturing simulation / digital twin
 
-The final experiment does **not** support the claim that PPO adds value over the strongest fixed dispatching rule in the current scheduling formulation.
+The project began with dynamic heterogeneous parallel-machine scheduling and then added a separate true-FJSP stack. Across the repository the simulator/evaluation infrastructure covers:
 
-`WEIGHTED_COMPOSITE` has lower mean priority-weighted tardiness than the five-training-seed PPO mean in **all 10 final scenarios**.
+- stochastic/dynamic job release;
+- heterogeneous machines;
+- priorities and due dates;
+- sequence/family setup effects;
+- event-driven decision epochs;
+- multi-operation jobs with strict precedence;
+- operation-specific alternative eligible machines;
+- machine-dependent processing times;
+- explicit `(job, operation, machine)` scheduling actions;
+- weighted tardiness, makespan, flow-time, waiting, setup, utilization, and decision-latency KPIs.
 
-Selected results:
+### 2. Strong deterministic scheduling baselines
 
-| Scenario | PPO seed-mean WTT | Weighted Composite WTT | CP-SAT WTT |
-| --- | ---: | ---: | ---: |
-| nominal | 70.7847 | **63.2547** | 69.1594 |
-| demand +60% | 547.4742 | **489.9622** | 572.7199 |
-| breakdown 4× | 166.9652 | **152.2761** | 166.1493 |
-| setup 2× | 195.6319 | **186.9471** | 205.5845 |
-| compound stress | 820.9690 | **757.3032** | 896.0073 |
+The true-FJSP closing panel contains eight feasible dispatch operators:
 
-PPO robustly beats the frozen CP-SAT controller on primary weighted tardiness only under `compound_stress` after PPO training-seed uncertainty is retained: **8.37% improvement**, hierarchical 95% interval **[1.1970, 142.0060]**, Holm-adjusted paired p-value **0.0020**. This is not an overall RL win because Weighted Composite is still better in the same regime.
+- Earliest Due Date;
+- Shortest Processing;
+- Minimum Setup;
+- Highest Priority;
+- Minimum Slack;
+- Critical Ratio;
+- Same Family First;
+- Weighted Tardiness Risk.
 
-Training-seed instability is material. PPO WTT standard deviation across the five frozen training seeds rises from **7.3307** nominally to **86.0259** under compound stress. One PPO model (seed 303) produces final episode-level KPI vectors exactly identical to `WEIGHTED_COMPOSITE` across all 1,000 scenario-seed episodes, while seed 202 exactly matches `MINIMUM_SETUP` / `SAME_FAMILY_FIRST`. These are outcome-equivalence diagnostics, consistent with policy collapse toward existing heuristics; direct action-trace logging is a planned diagnostic extension.
+These provide transparent, extremely fast baselines instead of comparing learning only against weak FIFO-style rules.
 
-Full interpretation and evidence: [`docs/final_comparative_results.md`](docs/final_comparative_results.md).
+### 3. Rolling-horizon CP-SAT
 
-Compact frozen result files: [`results/final_comparative/`](results/final_comparative/).
+The FJSP optimizer replans at each decision epoch and executes only the first decision before replanning. The final configuration was frozen before final access:
 
-## Controller formulations
+- horizon: **4 jobs**;
+- solve budget: **100 ms**;
+- single search worker;
+- fixed solver seed;
+- final fallback rate: **0.0**.
 
-### PPO hyper-heuristic
+Frozen selection provenance: [`configs/fjsp_cpsat_validation_freeze.json`](configs/fjsp_cpsat_validation_freeze.json).
 
-The PPO agent receives a 14-dimensional normalized operational state and selects one of eight dispatching rules: FIFO, highest priority, EDD, SPT, same-family-first, minimum setup, critical ratio, or a weighted composite rule.
+### 4. Reinforcement learning — tested, not promoted
 
-The RL action therefore selects a dispatching heuristic rather than an arbitrary job-machine pair. This keeps the action space fixed and feasible while testing whether state-dependent heuristic switching adds value.
+Two RL formulations were implemented with real multi-seed training and reproducibility manifests.
 
-Five frozen PPO models use training seeds `101, 202, 303, 404, 505`, each trained for 150,000 timesteps. Scientific claims retain all five training-seed realizations; the best seed is never substituted for the multi-seed result.
+#### Direct-action Maskable PPO
 
-Frozen PPO provenance and hashes are stored in [`configs/ppo_validation_freeze.json`](configs/ppo_validation_freeze.json).
+Maskable PPO selected directly from the dynamic feasible FJSP assignment set.
 
-### Rolling-horizon CP-SAT
+- training seeds: `701, 1701, 2701, 3701, 4701`;
+- 150,000 timesteps per seed;
+- independent validation instances: `41100–41129`;
+- aggregate WTT across training seeds: **82.5118**;
+- mean paired improvement versus frozen CP-SAT: **-62.0959**, CI **[-63.4498, -60.3620]**.
 
-At each decision epoch CP-SAT sees only jobs already released into the queue and machines currently available. It cannot inspect future arrivals, breakdown realizations, or repair durations.
+It was rejected before final testing. See [`configs/fjsp_direct_ppo_validation_freeze.json`](configs/fjsp_direct_ppo_validation_freeze.json).
 
-The optimizer plans a bounded released-job horizon with machine-dependent processing durations and sequence-dependent setups, executes only the first assignment, and replans. Priority-weighted tardiness is the primary objective.
+#### PPO operator-selection hyper-heuristic
 
-The frozen final configuration is:
+PPO selected one of the eight always-feasible dispatch operators, which then produced the concrete FJSP assignment.
 
-- horizon: **8 released jobs**;
-- solve budget: **100 ms per decision**;
-- validation mean WTT: **72.5101**;
-- validation mean decision latency: **21.4080 ms**;
-- validation fallback rate: **0.00%**.
+- training seeds: `901, 1901, 2901, 3901, 4901`;
+- 150,000 timesteps per seed;
+- independent validation instances: `41200–41229`;
+- aggregate WTT across training seeds: **38.4618**;
+- versus Weighted Tardiness Risk: **-6.6371**, CI **[-9.9216, -3.5945]**;
+- versus frozen CP-SAT: **-17.3337**, CI **[-20.6181, -14.1696]**.
 
-Frozen provenance is stored in [`configs/cpsat_operating_point.json`](configs/cpsat_operating_point.json).
+It improved on several weaker operators but did not clear the strong-baseline gate, so it was also excluded from final testing. See [`configs/fjsp_hh_validation_decision.json`](configs/fjsp_hh_validation_decision.json).
 
-## Final-test design
+No best RL training seed is substituted for the algorithm-level result.
 
-The final campaign used:
+## Scientific design
 
-- nominal seeds `20000–20099`;
-- nine stress scenarios with seeds `30000–30099`;
-- all eight fixed rules;
-- all five frozen PPO models;
-- frozen CP-SAT H=8 / 100 ms;
-- 5,000 bootstrap resamples;
-- 10,000 paired randomization permutations;
-- Holm correction across the 20 primary PPO-vs-Weighted-Composite / PPO-vs-CP-SAT WTT tests.
+The project uses explicit data partitions so that model selection and final reporting are separated.
 
-For primary PPO inference, metrics are first averaged across the five PPO training seeds within each environment seed, then compared pairwise across environment seeds. Weighted-tardiness confidence intervals additionally use a hierarchical bootstrap over both training and environment seeds. The 5 × N PPO rows are not treated as independent observations.
+Phase-5 seed regime:
 
-No PPO hyperparameter, training seed, CP-SAT setting, scenario definition, fixed baseline, or final seed range was changed after final-test outcomes were observed.
+- development: `40000–40999`;
+- CP-SAT tuning/selection: `41000–41029`;
+- direct-action PPO validation: `41100–41129`;
+- operator-selection PPO validation: `41200–41229`;
+- reserved but unused v2 validation: `41300–41329`;
+- final FJSP test: `42000–42099` — **consumed and closed**.
 
-## Installation
+The final FJSP block was opened once after controller selection was complete. It must not be used for future tuning or RL model selection.
+
+Core evaluation practices include:
+
+- common random numbers / common instance fingerprints;
+- multiple independent RL training seeds;
+- fixed validation and final-test boundaries;
+- bootstrap confidence intervals;
+- paired randomization inference;
+- effect sizes and probability of superiority;
+- online decision latency;
+- solver fallback/reliability accounting;
+- model, manifest, and artifact SHA-256 provenance;
+- CI-enforced experiment contracts.
+
+## Project evolution
+
+The repository preserves two complete research stages.
+
+### Phase 1–4 — dynamic heterogeneous parallel machines
+
+The original simulator included stochastic arrivals, setups, failures/repairs and OOD stress scenarios. Five-seed PPO was compared with eight fixed rules and rolling-horizon CP-SAT over nominal and distribution-shift final campaigns.
+
+Result: the strongest fixed composite rule beat the PPO training-seed mean on weighted tardiness in all ten final scenarios. This negative RL result was frozen rather than tuned away.
+
+Evidence: [`docs/final_comparative_results.md`](docs/final_comparative_results.md) and [`results/final_comparative/`](results/final_comparative/).
+
+### Phase 5 — true FJSP
+
+The richer FJSP stack introduced precedence, alternative machines, multi-operation routing and dynamic release times. It produced the project’s closing decision result: **rolling-horizon CP-SAT is the best WTT controller in the final frozen panel; Minimum Slack is the low-latency alternative; both tested RL architectures fail their validation gates.**
+
+## Reproducibility
+
+### Install
 
 ```bash
 python -m venv .venv
@@ -115,72 +162,92 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e ".[rl,or,dev,analysis]"
 ```
 
-## Tests
+### Quality gates
 
 ```bash
-pytest
 ruff check src tests
+pytest --cov=dmdtrl --cov-report=term-missing --cov-fail-under=85
 ```
 
-## Reproduce one PPO member
+CI runs these checks on Python 3.10, 3.11 and 3.12. Python 3.11 also executes real OR-Tools research smoke tests.
+
+### Audit the frozen FJSP final benchmark
+
+The final workflow is retained for **audit/reproduction only**. The seed block is already consumed and must not be used to select or retune controllers.
 
 ```bash
-dmdtrl-train \
-  --steps 150000 \
-  --seed 101 \
-  --output models/ppo_dispatcher \
-  --metadata models/ppo_dispatcher_manifest.json \
-  --device cpu \
-  --quiet
+python -m dmdtrl.fjsp_final \
+  --config configs/fjsp_final_baseline_test.json \
+  --environment-design configs/fjsp_hh_validation_design.json \
+  --cpsat-freeze configs/fjsp_cpsat_validation_freeze.json \
+  --rl-decision configs/fjsp_hh_validation_decision.json \
+  --output-root results/fjsp_final_audit \
+  --bootstrap 5000 \
+  --permutations 10000
 ```
 
-See [`docs/ppo_reproducibility.md`](docs/ppo_reproducibility.md).
+Final benchmark provenance:
 
-## Distribution-shift scenarios
+- PR: **#28**;
+- workflow run: **33271196539**;
+- artifact ID: **9720170969**;
+- artifact SHA-256: `8cdef3fb72df4f88156043b1e2aa54daf3f0ad92493385dca58bf1e814a4abf9`;
+- benchmark implementation merge: `a1071cfcea3f2b3e1b206ef3eb53325258dced03`.
 
-The final OOD matrix includes:
+## Repository map
 
-- +20%, +40%, +60% arrival intensity;
-- 2× and 4× breakdown probability;
-- tighter due dates;
-- slower machines;
-- 2× setup pressure;
-- compound demand/disruption/due-date/speed/setup stress.
+Key modules and evidence:
 
-## GitHub Actions
+- `src/dmdtrl/fjsp_simulator.py` — deterministic event-driven FJSP transition core;
+- `src/dmdtrl/fjsp_env.py` — masked Gymnasium FJSP environment;
+- `src/dmdtrl/fjsp_optimization.py` — rolling-horizon CP-SAT controller;
+- `src/dmdtrl/fjsp_operators.py` — eight deterministic FJSP dispatch operators;
+- `src/dmdtrl/fjsp_hyperheuristic_env.py` — operator-selection RL environment;
+- `src/dmdtrl/fjsp_final.py` — frozen one-time final benchmark/audit runner;
+- `configs/` — frozen data boundaries, model-selection decisions and provenance;
+- `docs/final_project_report.md` — final scientific report;
+- `configs/project_completion.json` — machine-readable project completion state;
+- `.github/workflows/` — CI, RL/OR campaigns and final benchmark gates.
 
-- `CI`: Python 3.10/3.11/3.12 lint, tests, coverage, research smoke, stress smoke, CP-SAT smoke, and sensitivity smoke.
-- `RL Smoke`: short Stable-Baselines3 training/inference integration test; not policy-quality evidence.
-- `OR Validation`: completed 30-seed CP-SAT validation campaign with reliability gating and artifacts.
-- `PPO Validation`: completed five-member long-horizon PPO campaign with common validation seeds, model artifacts, hashes, and aggregate manifest.
-- `Final Comparative Campaign`: completed frozen nominal + nine-scenario OOD campaign with completeness, seed-boundary, hash, and artifact gates.
+## What this project demonstrates
 
-## Research phases
+From an Industrial Engineering / OR perspective, the repository demonstrates the full decision-model lifecycle rather than a single optimization notebook:
 
-1. **Validated simulator + deterministic baselines:** complete.
-2. **Rolling-horizon OR baseline and operating-point freeze:** complete; frozen at **H=8 / 100 ms**.
-3. **PPO hyper-heuristic multi-seed validation:** complete; five models frozen.
-4. **Full nominal + stress comparative experiment:** **complete**; final evidence frozen.
-5. **True flexible job-shop / richer adaptivity extension:** next research phase.
-6. **Decision-twin service/dashboard layer:** planned.
+1. formalize operations and constraints;
+2. implement an event-driven digital twin;
+3. construct strong interpretable baselines;
+4. build a rolling-horizon mathematical optimizer;
+5. add adaptive RL controllers where sequential adaptation is plausible;
+6. evaluate all controllers on common out-of-sample instances;
+7. account for compute latency and reliability;
+8. reject models that fail independent validation;
+9. open a blinded final test once;
+10. freeze the resulting operational recommendation with provenance.
 
-See [`docs/roadmap.md`](docs/roadmap.md).
+The most important portfolio signal is methodological: **model complexity must earn its place against strong OR and heuristic alternatives.**
 
-## What the negative result means
+## Limitations
 
-The project intentionally does not tune PPO against final seeds or hide unfavorable training seeds. In the current model, a very cheap hand-designed composite rule is difficult to beat and several PPO training realizations converge toward behavior that is operationally indistinguishable from existing heuristics.
+The final Phase-5 result is scoped to the synthetic FJSP decision twin in this repository. It is not a claim about all manufacturing plants or all FJSP distributions.
 
-That result narrows the next research question. Future RL work should target problem structure where state-dependent adaptation has a credible role: multi-operation routing and precedence, changing machine eligibility, urgent-order bursts, richer family-to-family setups, explicitly pre-generated exogenous disruption plans, and larger dynamic feasible action sets.
+Current limitations include:
 
-## Portfolio sequence
+- no live MES/ERP/IoT integration;
+- no plant-calibrated real production data;
+- no stochastic breakdown process in the closing FJSP stack;
+- bounded frozen problem scale (12 jobs, 5 machines);
+- no ALNS/neighborhood-search comparator in the final FJSP panel;
+- no RL result on final seeds because both RL architectures were correctly rejected at validation.
 
-This repository is the first flagship. Planned follow-on repositories cover joint production/maintenance decisions, dynamic EV routing and charging, multi-echelon supply-chain decisions, and other IE/OR decision-twin problems. The shared standard is:
+These are optional follow-on extensions, not unfinished requirements of this completed repository.
 
-**OR baseline + stochastic simulator/digital twin + adaptive policy + compute/reliability accounting + paired out-of-sample validation.**
+## Project status
 
-## Scientific principle
+All required research, validation, final-test and documentation gates for this repository are complete. The experimental `operator_selection_v2` branch was archived without merge and without opening its reserved validation block.
 
-A learned policy is not superior because training reward rises, and an optimizer is not superior because it solves a mathematical model. Operational KPIs, online compute cost, solver reliability, training-seed variability, robustness, and paired out-of-sample evidence determine the conclusion. A fixed heuristic winning is a valid and useful result.
+Future dashboards, live-data connectors, richer disruptions, ALNS/GNN policies or additional RL research should be treated as separate extensions or new repositories rather than prerequisites for completion.
+
+See [`docs/roadmap.md`](docs/roadmap.md) for the closed research roadmap.
 
 ## License
 
