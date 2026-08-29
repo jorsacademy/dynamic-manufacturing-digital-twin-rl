@@ -20,7 +20,7 @@ on:
       - "tests/test_fjsp_hh_campaign.py"
       - "tests/test_fjsp_hh_protocol.py"
       - "tests/test_fjsp_hh_train.py"
-      - "tests/test_fjsp_hyperheuristic_env.py"
+      - "tests/test_fjsp_hyperheuristic.py"
 
 permissions:
   contents: read
@@ -81,7 +81,7 @@ jobs:
           pytest
           tests/test_fjsp_hh_campaign.py
           tests/test_fjsp_hh_protocol.py
-          tests/test_fjsp_hyperheuristic_env.py
+          tests/test_fjsp_hyperheuristic.py
           tests/test_fjsp_optimization.py
 
       - name: Evaluate eight frozen operators and frozen CP-SAT once
@@ -154,7 +154,7 @@ jobs:
           tests/test_fjsp_hh_campaign.py
           tests/test_fjsp_hh_protocol.py
           tests/test_fjsp_hh_train.py
-          tests/test_fjsp_hyperheuristic_env.py
+          tests/test_fjsp_hyperheuristic.py
 
       - name: Train and validate predeclared PPO member
         env:
