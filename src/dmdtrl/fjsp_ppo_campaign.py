@@ -15,7 +15,6 @@ import numpy as np
 
 from dmdtrl.statistics import bootstrap_mean_ci, paired_estimate
 
-
 TRAINING_SEED_MAX_EXCLUSIVE = 40_000
 OR_VALIDATION_SEED_MIN = 41_000
 PPO_VALIDATION_SEED_MIN = 41_100
