@@ -8,6 +8,7 @@ from gymnasium import spaces
 
 from dmdtrl.fjsp_env import FJSPEnvConfig, FlexibleJobShopEnv
 from dmdtrl.fjsp_operators import FJSPOperator, OPERATOR_NAMES, select_operator_action
+from dmdtrl.fjsp_simulator import FlexibleJobShopSimulator
 
 
 class FlexibleJobShopHyperHeuristicEnv(gym.Env[np.ndarray, int]):
@@ -38,7 +39,7 @@ class FlexibleJobShopHyperHeuristicEnv(gym.Env[np.ndarray, int]):
         return self.base_env.config
 
     @property
-    def simulator(self):  # type: ignore[no-untyped-def]
+    def simulator(self) -> FlexibleJobShopSimulator | None:
         return self.base_env.simulator
 
     def reset(
