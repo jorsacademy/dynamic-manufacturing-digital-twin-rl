@@ -1,88 +1,57 @@
 # Phase-5 Maskable PPO validation
 
-This stage estimates whether a mask-aware learned FJSP dispatcher is robust to training randomness before any Phase-5 final-test instance is accessed.
+This stage tested whether a mask-aware policy that directly selects `(job, operation, machine)` actions is robust enough to justify access to the Phase-5 final-test instances.
 
 ## Frozen comparison boundary
 
-The rolling-horizon CP-SAT baseline was selected first, independently of the PPO campaign, on seeds `41000-41029`. The frozen operating point is:
-
-- job horizon: `4`;
-- online solve budget: `100 ms`;
-- one CP-SAT search worker;
-- fixed solver random seed;
-- validation WTT mean: `25.0983`;
-- validation mean decision latency: `25.0964 ms`;
-- validation fallback rate: `0%`.
-
-The exact provenance and selection thresholds are stored in `configs/fjsp_cpsat_validation_freeze.json`. The PPO campaign must not retune this baseline.
+The rolling-horizon CP-SAT baseline was selected first, independently of PPO, on seeds `41000-41029`. Its frozen operating point is job horizon `4`, online solve budget `100 ms`, one search worker, and fixed solver random seed. The exact selection provenance is stored in `configs/fjsp_cpsat_validation_freeze.json`.
 
 ## Seed separation
-
-Phase-5 uses separate data blocks for separate decisions:
 
 | Role | Seeds |
 | --- | --- |
 | development/smoke | `40000-40999` |
 | CP-SAT tuning | `41000-41029` |
-| Maskable PPO validation | `41100-41129` |
-| nominal final test, embargoed during selection | `42000-42099` |
+| direct Maskable PPO validation | `41100-41129` |
+| nominal final test | `42000-42099` |
 
-The PPO validation workflow asserts that no evaluation row reaches seed `42000`.
+The validation workflow asserted that no evaluation row reached seed `42000`.
 
 ## Training design
 
-The campaign trains five independent Maskable PPO realizations with training seeds:
+Five independent Maskable PPO realizations were trained with seeds `701, 1701, 2701, 3701, 4701`. Every member used the same predeclared configuration: 150,000 timesteps, learning rate `3e-4`, rollout length `1024`, batch size `128`, gamma `0.99`, GAE lambda `0.95`, entropy coefficient `0.01`, two 128-unit hidden layers, and CPU execution.
 
-`701, 1701, 2701, 3701, 4701`
-
-Every member uses the same predeclared configuration:
-
-- `150,000` timesteps;
-- learning rate `3e-4`;
-- rollout length `1024`;
-- batch size `128`;
-- gamma `0.99`;
-- GAE lambda `0.95`;
-- entropy coefficient `0.01`;
-- two `128`-unit policy/value hidden layers;
-- CPU execution.
-
-The FJSP generator remains fixed at 12 jobs, 5 machines, 2-4 operations per job, up to 3 eligible machines per operation, and the current Phase-5 processing/due-date distributions.
-
-## Evaluation architecture
-
-The fixed baseline panel is evaluated once on the 30 PPO validation instances:
-
-1. earliest due date;
-2. shortest processing;
-3. frozen rolling-horizon CP-SAT.
-
-Each trained PPO member is then evaluated on exactly the same 30 instance seeds using deterministic masked inference. Canonical SHA-256 instance fingerprints must match the baseline panel seed by seed.
-
-This avoids rerunning the wall-clock-bounded CP-SAT solver five times and accidentally treating slightly different solver trajectories as five baseline replications.
+The FJSP generator stayed fixed at 12 jobs, 5 machines, 2-4 operations per job, and up to 3 eligible machines per operation.
 
 ## Statistical unit
 
-The 150 PPO validation episodes are not treated as 150 independent algorithm replications.
+The 150 PPO validation episodes were not pooled as independent algorithm replications. For each training seed, paired WTT differences were first computed over the same 30 canonical instance fingerprints. The top-level robustness summary then used the five independent training-seed realizations as its inference unit.
 
-For each training seed, the evaluator first computes paired WTT differences against each baseline across the 30 common instances. The campaign then summarizes those five training-seed-level mean improvements. Thus the top-level inference unit for learned-policy robustness is the independent training seed.
+## Validation result
 
-Artifacts retain:
+The direct-action policy failed the validation gate.
 
-- per-instance PPO rows;
-- one fixed baseline panel;
-- per-training-seed WTT and latency summaries;
-- per-training-seed paired baseline comparisons;
-- across-training-seed bootstrap summaries;
-- model and training-manifest SHA-256 hashes;
-- exact runtime package versions.
+| Controller | Validation WTT mean |
+| --- | ---: |
+| rolling-horizon CP-SAT | 20.416 |
+| earliest due date | 33.587 |
+| shortest processing | 52.943 |
+| direct Maskable PPO, mean over five training seeds | 82.512 |
 
-## Representative model
+The five PPO member WTT means were `84.519`, `82.917`, `82.823`, `82.948`, and `79.352`. Mean decision latency was approximately `0.370 ms`, so the learned dispatcher was computationally fast but operationally poor.
 
-A single representative model is selected only for deployment/demo continuity. It is the training realization whose validation mean WTT is closest to the median across all five members, with latency and seed used only as tie-breakers.
+At the independent training-seed level, mean paired WTT improvement was negative against every comparator:
 
-This representative model must not replace the five-training-seed evidence in scientific claims. The best validation member is never selected simply because it is best.
+- vs EDD: `-48.925`, bootstrap CI `[-50.279, -47.191]`;
+- vs frozen CP-SAT: `-62.096`, bootstrap CI `[-63.450, -60.362]`;
+- vs SPT: `-29.568`, bootstrap CI `[-30.916, -27.841]`.
 
-## Next gate
+Training-seed win fraction was `0/5` against all three baselines. The representative median-role member is seed `1701`; it is retained only for reproducibility and demo continuity, not as a positive performance result.
 
-After this campaign is frozen, Phase-5 final nominal evaluation may use seeds `42000-42099`. Final claims must retain all five declared training realizations and compare them against the already frozen CP-SAT operating point and heuristic baselines.
+The full frozen result and model hashes are stored in `configs/fjsp_direct_ppo_validation_freeze.json`.
+
+## Decision gate
+
+The final nominal block `42000-42099` remains embargoed. Spending held-out final instances on a controller that failed all validation baselines would add little evidence and would consume the clean final-test budget.
+
+The next RL design changes the action abstraction rather than tuning the rejected flat policy. PPO will act as a small fixed-action hyper-heuristic that selects among strong feasible dispatching operators. The redesigned controller must pass a fresh validation gate before any Phase-5 final seed is accessed.
