@@ -16,7 +16,6 @@ from dmdtrl.fjsp_evaluate import (
 )
 from dmdtrl.fjsp_generator import FJSPGeneratorConfig, generate_fjsp_instance
 
-
 VALIDATION_SEED_MIN = 41_100
 FINAL_SEED_MIN = 42_000
 
