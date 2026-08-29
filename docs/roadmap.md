@@ -1,186 +1,201 @@
-# Research Roadmap
+# Research Roadmap — Closed
 
-## Phase 1 — Validated simulator and deterministic baselines
+**Project status: COMPLETE.**
+
+This roadmap records the work that was completed in this repository. There are no remaining required research phases. Any service/dashboard layer, live-data integration, richer disruption model, ALNS/GNN controller, or further RL iteration is optional follow-on work and is not part of the completed project scope.
+
+## Phase 1 — Validated manufacturing simulator and deterministic baselines
 
 Status: **complete.**
 
 Delivered:
 
 - event-driven dynamic manufacturing simulator;
-- stochastic arrivals, heterogeneous machines, sequence-dependent setups, failures/repairs, priorities, due dates, and quality risk;
-- eight deterministic dispatching rules;
-- operational KPI definitions and reproducible common-random-number evaluation;
+- stochastic arrivals, heterogeneous machines, setup effects, failures/repairs, priorities, due dates, and quality-risk terms in the original parallel-machine stack;
+- deterministic dispatching baselines;
+- operational KPI definitions;
+- common-random-number evaluation;
 - unit/integration tests and multi-version CI.
 
-## Phase 2 — Rolling-horizon OR benchmark
+## Phase 2 — Rolling-horizon OR baseline
 
 Status: **complete and frozen.**
 
 Delivered:
 
 - released-job-only rolling-horizon CP-SAT;
-- explicit job-machine assignment decisions through the same simulator transition logic used by RL;
-- machine-dependent processing times and sequence-dependent setup transitions;
-- bounded online solve time and measured decision latency;
-- deterministic feasible fallback for solver `UNKNOWN` timeouts;
+- job/machine assignment through the same simulator transition logic used by adaptive controllers;
+- machine-dependent processing and setup treatment;
+- online solve-budget and decision-latency accounting;
+- deterministic timeout/fallback handling;
 - solver reliability reporting;
 - horizon × solver-budget sensitivity analysis;
-- 30-seed validation campaign on `10000–10029`;
-- reliability-gated operating-point selection;
-- frozen H=8 / 100 ms provenance in `configs/cpsat_operating_point.json`.
+- validation-based operating-point selection.
 
-Frozen OR operating point:
+The original parallel-machine operating point is frozen in `configs/cpsat_operating_point.json`.
 
-- horizon: **8 released jobs**;
-- solve budget: **100 ms**;
-- validation WTT: **72.5101**;
-- mean decision latency: **21.4080 ms**;
-- fallback rate: **0.00%**.
-
-## Phase 3 — PPO hyper-heuristic multi-seed validation
+## Phase 3 — Parallel-machine PPO hyper-heuristic validation
 
 Status: **complete and frozen.**
 
 Delivered:
 
-- Stable-Baselines3 PPO hyper-heuristic over eight dispatching rules;
-- reproducible training manifests with runtime/package metadata;
-- five independent 150,000-timestep training runs (`101, 202, 303, 404, 505`);
-- common validation seeds `10000–10029`;
-- bootstrap confidence intervals, paired tests, effect sizes, and probability of superiority;
-- model/manifests SHA-256 verification;
-- training-seed dispersion reporting;
-- representative-model selection that does not cherry-pick the best seed;
-- frozen validation provenance in `configs/ppo_validation_freeze.json`.
+- Stable-Baselines3 PPO over eight dispatch rules;
+- five independent long-horizon training runs;
+- model/manifests hashes;
+- common validation instances;
+- bootstrap intervals, paired tests, effect sizes, probability of superiority, and training-seed dispersion;
+- representative-model handling without best-seed substitution.
 
-Validation WTT by training seed:
-
-- seed 101: **77.0644**;
-- seed 202: **83.4609**;
-- seed 303: **73.8590**;
-- seed 404: **72.9942**;
-- seed 505: **83.2213**.
-
-Scientific rule: final PPO claims retain all five training-seed realizations.
-
-## Phase 4 — Full nominal and distribution-shift comparison
+## Phase 4 — Parallel-machine nominal + distribution-shift final campaign
 
 Status: **complete; final evidence frozen.**
 
-Final campaign design:
-
-- all five frozen PPO training-seed realizations;
-- frozen CP-SAT H=8 / 100 ms;
-- all eight fixed dispatching rules;
-- nominal seeds `20000–20099`;
-- nine OOD scenarios with common seeds `30000–30099`;
-- priority-weighted tardiness as primary KPI;
-- paired environment-seed comparisons;
-- hierarchical bootstrap over PPO training-seed and environment-seed uncertainty;
-- Holm correction across the twenty primary WTT tests;
-- no controller or scenario retuning after final-test access.
-
 Final result:
 
-- `WEIGHTED_COMPOSITE` has lower mean WTT than the five-training-seed PPO mean in **10/10 scenarios**;
-- PPO robustly beats frozen CP-SAT on WTT only under `compound_stress` after hierarchical training-seed uncertainty is retained;
-- the same compound-stress regime is still won by `WEIGHTED_COMPOSITE`, so it is not an overall RL advantage;
-- PPO training-seed WTT dispersion grows from **7.3307** nominally to **86.0259** under compound stress;
-- PPO seed 303 is outcome-equivalent to `WEIGHTED_COMPOSITE` across all 1,000 final scenario-seed episodes, and seed 202 is outcome-equivalent to `MINIMUM_SETUP` / `SAME_FAMILY_FIRST` across all 1,000 episodes.
-
-Scientific conclusion: the current parallel-machine state/action/reward formulation does not justify PPO complexity over the strongest fixed dispatching rule. This negative result is retained rather than tuned away.
+- `WEIGHTED_COMPOSITE` had lower mean priority-weighted tardiness than the five-training-seed PPO mean in all 10 final scenarios;
+- PPO beat frozen CP-SAT robustly only in compound stress, but Weighted Composite still beat PPO in that scenario;
+- the result therefore did not justify PPO complexity over the strongest fixed baseline;
+- unfavorable training seeds and policy-collapse diagnostics were retained rather than hidden.
 
 Evidence:
 
 - `docs/final_comparative_results.md`;
-- `results/final_comparative/`;
-- GitHub Actions final artifact `9712700007`.
+- `results/final_comparative/`.
 
-## Phase 5 — True flexible job-shop and stronger adaptivity test
+## Phase 5 — True flexible job-shop decision twin
 
-Status: **in progress.**
+Status: **complete; final evidence frozen.**
 
-The current validated v1.0 environment remains the locked dynamic heterogeneous parallel-machine model. Phase 5 is a separate FJSP stack so the Phase-4 result remains reproducible while the scheduling structure becomes materially richer.
+### FJSP core
 
-Delivered in the first Phase-5 increment:
+Delivered:
 
-- multi-operation jobs with explicit ordered operation chains;
-- strict precedence enforcement;
-- alternative eligible machines per operation;
-- operation- and machine-dependent processing times;
+- ordered multi-operation jobs;
+- strict operation precedence;
+- operation-specific alternative eligible machines;
+- machine-dependent processing times;
 - dynamic job release times;
-- explicit `(job, operation, machine)` assignment actions;
+- explicit `(job, operation, machine)` actions;
 - event-driven advancement to the next feasible decision epoch;
-- family-dependent sequence setup support, including optional family-to-family setup maps;
-- reproducible stochastic FJSP instance generation;
-- operation-level schedules and job-level tardiness/flow-time metrics;
-- deterministic shortest-processing and earliest-due-date feasibility baselines;
-- tests for precedence, eligibility, releases, setups, reproducibility, and full-instance completion.
+- family/setup effects;
+- reproducible stochastic FJSP generation;
+- operation-level schedules and job-level weighted-tardiness/flow-time metrics.
 
-Delivered in the second Phase-5 increment:
+### FJSP Gymnasium / action feasibility
 
-- Gymnasium-compatible FJSP decision environment;
-- fixed-capacity discrete action indexing over job × operation × machine slots;
-- exact Boolean dynamic feasibility mask derived from simulator state;
-- normalized global, per-job, routing, processing-time, and per-machine observation features;
+Delivered:
+
+- fixed-capacity action indexing;
+- exact Boolean dynamic feasibility masks;
+- normalized global/job/routing/machine state features;
 - infeasible-action rejection instead of silent repair;
-- action-trace logging with decision time, encoded action, job/operation/machine ids, feasible-action count, completion status, and reward;
-- incremental operation/job completion reward with waiting/setup/final weighted-tardiness penalties;
-- tests that the action mask exactly equals the simulator-feasible set.
+- decision traces;
+- waiting/setup/final-tardiness reward components;
+- simulator/action-mask equivalence tests.
 
-See `docs/fjsp_core.md`.
+### Strong FJSP OR comparator
 
-Next Phase-5 increment:
+Delivered:
 
-- strong FJSP rolling-horizon CP-SAT / interval-scheduling baseline;
-- explicit operation precedence and alternative-machine optional intervals;
-- sequence/setup treatment compatible with the FJSP simulator;
-- decision-latency and solver-reliability accounting;
-- a Phase-5 development/validation seed partition separate from locked Phase-4 seeds.
+- rolling-horizon FJSP CP-SAT;
+- validation-only horizon/solve-budget selection on `41000–41029`;
+- frozen final operating point `FJSP_CPSAT_H4_B100MS`;
+- decision latency and fallback accounting.
 
-Subsequent model upgrades:
+### Direct-action Maskable PPO
 
-- richer family-to-family setup matrices;
-- urgent-order bursts;
-- explicitly pre-generated exogenous disruption plans;
-- explicit physical completion events and completion-timed reward/KPI accounting;
-- productive-utilization versus occupancy separation.
+Status: **implemented, validated, rejected.**
 
-Subsequent algorithm upgrades:
+- training seeds: `701, 1701, 2701, 3701, 4701`;
+- 150,000 timesteps per seed;
+- validation seeds: `41100–41129`;
+- aggregate validation WTT: `82.5118`;
+- paired training-seed mean improvement versus frozen CP-SAT: `-62.0959`, CI `[-63.4498, -60.3620]`;
+- no training realization passed the final-test gate.
 
-- `sb3-contrib` Maskable PPO after the strong FJSP OR comparator exists;
-- action-trace / policy-entropy diagnostics against deterministic and OR baselines;
-- strong neighborhood-search or ALNS-style baselines;
-- graph/attention state encoders only if the FJSP structure warrants them.
+Frozen evidence: `configs/fjsp_direct_ppo_validation_freeze.json`.
 
-The locked Phase-4 final seeds remain untouched. Phase 5 receives new development/validation/final seed partitions.
+### PPO operator-selection hyper-heuristic
 
-## Phase 6 — Decision-twin service layer
+Status: **implemented, validated, rejected.**
 
-Expose synchronized simulator state, KPIs, controller recommendations, and scenario controls through an API/dashboard.
+- action space: eight deterministic feasible dispatch operators;
+- training seeds: `901, 1901, 2901, 3901, 4901`;
+- 150,000 timesteps per seed;
+- validation seeds: `41200–41229`;
+- aggregate validation WTT: `38.4618`;
+- versus Weighted Tardiness Risk: `-6.6371`, CI `[-9.9216, -3.5945]`;
+- versus frozen CP-SAT: `-17.3337`, CI `[-20.6181, -14.1696]`;
+- not promoted to final testing.
 
-Target capabilities:
+Frozen evidence: `configs/fjsp_hh_validation_decision.json`.
 
-- current WIP and queue state;
-- machine/disruption state;
-- selected RL rule or OR assignment;
-- predicted tardiness risk;
-- controller KPI/latency comparison;
-- what-if scenario controls.
+### Operator-selection v2
 
-3D visualization remains optional. The core value is the synchronized decision model and closed-loop recommendation layer.
+Status: **archived without merge or validation.**
 
-## Portfolio projects after this flagship
+A new validation block (`41300–41329`) had been reserved, but the project was intentionally closed instead of starting another research iteration. PR #27 was closed without merge and the reserved block was never opened.
 
-Follow-on repositories will use the same research-grade pattern—strong OR/control baseline, stochastic simulator or digital twin, adaptive policy, CI, and paired evaluation—while covering different IE/OR problem classes.
+### One-time FJSP final benchmark
 
-Planned sequence:
+Status: **complete and consumed.**
 
-1. **Joint Production + Maintenance Decision Twin** — machine degradation, predictive-maintenance timing, queues, due-date pressure, failure risk, and rolling-horizon OR versus adaptive/hierarchical policies.
-2. **Dynamic EV Routing + Charging Decision Twin** — OR-Tools/ALNS feasibility foundation with dynamic orders, traffic/charging uncertainty, and RL operator or strategy selection.
-3. **Multi-Echelon Supply-Chain Decision Twin** — base-stock/stochastic-programming/MPC baselines versus adaptive inventory/allocation policies under nonstationarity and disruption.
-4. **Adaptive Quality / Capacity extensions** — only where a distinct decision problem and strong baseline justify a separate project.
+Final seeds: `42000–42099`.
 
-The shared portfolio methodology is:
+The final panel contained only the eight frozen dispatch rules plus the already-frozen FJSP CP-SAT controller. Both RL formulations were excluded because they failed validation before final access.
 
-**mathematical/OR baseline + stochastic simulator/digital twin + adaptive policy + compute/reliability accounting + paired out-of-sample validation.**
+Final WTT ranking:
+
+1. **Rolling-Horizon CP-SAT — 23.4672**;
+2. **Minimum Slack — 30.4134**;
+3. **Earliest Due Date — 32.4370**;
+4. Critical Ratio — 36.5716;
+5. Weighted Tardiness Risk — 37.0807;
+6. Highest Priority — 43.1420;
+7. Shortest Processing — 57.3151;
+8. Same Family First — 74.2901;
+9. Minimum Setup — 75.1594.
+
+Against Minimum Slack, CP-SAT reduced mean WTT by **22.84%**, paired CI **[2.7670, 11.4262]**, `p = 0.0008`, with **0.0 fallback**. Mean decision latency was **23.49 ms** for CP-SAT versus **0.014 ms** for Minimum Slack.
+
+Final artifact provenance:
+
+- PR #28;
+- workflow run `33271196539`;
+- artifact `9720170969`;
+- SHA-256 `8cdef3fb72df4f88156043b1e2aa54daf3f0ad92493385dca58bf1e814a4abf9`.
+
+The final block is now consumed. No controller may be retuned using these outcomes.
+
+## Completion decision
+
+The repository has answered its core decision question with a defensible operational recommendation:
+
+- use rolling-horizon CP-SAT when priority-weighted tardiness justifies a roughly 20–25 ms decision budget;
+- use Minimum Slack as the strongest near-zero-latency fixed alternative;
+- do not promote either tested RL formulation for this FJSP problem under the evaluated training/validation design.
+
+The project is therefore complete rather than "waiting for RL to win."
+
+Completion manifest: `configs/project_completion.json`.
+
+Final report: `docs/final_project_report.md`.
+
+## Optional work outside the completed scope
+
+The following are possible future projects or extensions, not open tasks in this repository:
+
+- MES/ERP/IoT live-state integration;
+- calibrated real-factory datasets;
+- stochastic FJSP machine breakdowns and repair decisions;
+- ALNS/neighborhood-search FJSP comparators;
+- graph/attention RL policies on larger variable-size instances;
+- FastAPI/dashboard decision-twin service layer;
+- joint production/maintenance decisions;
+- dynamic EV routing/charging;
+- multi-echelon supply-chain decision twins.
+
+The reusable portfolio methodology remains:
+
+**mathematical/OR baseline + simulator/digital twin + adaptive policy when justified + compute/reliability accounting + paired out-of-sample validation.**
