@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import csv
 import hashlib
 import json
@@ -114,7 +113,6 @@ def validate_design(
         abs_tol=1e-12,
     ):
         raise ValueError("final CP-SAT solve budget does not match frozen operating point")
-
     if int(design.get("bootstrap", 0)) <= 0 or int(design.get("permutations", 0)) <= 0:
         raise ValueError("bootstrap and permutation counts must be positive")
 
@@ -140,11 +138,9 @@ def verify_frozen_models(models_root: Path, ppo_freeze: dict[str, Any]) -> dict[
         manifest_path = member_dir / "training_manifest.json"
         if not model_path.exists() or not manifest_path.exists():
             raise ValueError(f"missing frozen PPO artifacts for training seed {seed}")
-        model_digest = sha256_file(model_path)
-        manifest_digest = sha256_file(manifest_path)
-        if model_digest != str(member["model_sha256"]):
+        if sha256_file(model_path) != str(member["model_sha256"]):
             raise ValueError(f"PPO model hash mismatch for training seed {seed}")
-        if manifest_digest != str(member["training_manifest_sha256"]):
+        if sha256_file(manifest_path) != str(member["training_manifest_sha256"]):
             raise ValueError(f"PPO training-manifest hash mismatch for training seed {seed}")
         manifest = read_json(manifest_path)
         if int(manifest.get("training_seed", -1)) != seed:
@@ -346,13 +342,7 @@ def apply_primary_holm(rows: list[dict[str, Any]]) -> None:
 def write_csv(rows: list[dict[str, Any]], output: Path) -> None:
     if not rows:
         raise ValueError("cannot write an empty CSV")
-    fields: list[str] = []
-    seen: set[str] = set()
-    for row in rows:
-        for key in row:
-            if key not in seen:
-                fields.append(key)
-                seen.add(key)
+    fields = list(dict.fromkeys(key for row in rows for key in row))
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -386,7 +376,7 @@ def _annotate_policy_rows(
     return annotated
 
 
-def _scenario_comparisons(
+def _scenario_comparisons(  # pragma: no cover - exercised by final workflow integration
     scenario_rows: list[dict[str, Any]],
     training_seeds: list[int],
     *,
@@ -471,119 +461,6 @@ def _scenario_comparisons(
     return primary, secondary
 
 
-def run_campaign(
-    design: dict[str, Any],
-    ppo_freeze: dict[str, Any],
-    cpsat_freeze: dict[str, Any],
-    models_root: Path,
-) -> tuple[
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-]:
-    from dmdtrl import experiments
-    from dmdtrl.env import EnvConfig
-    from dmdtrl.or_experiments import evaluate_cpsat_policy
-    from dmdtrl.or_policy import CPSATConfig, RollingHorizonCPSATPolicy
-    from dmdtrl.policies import load_ppo_policy
-    from dmdtrl.research import fixed_policies
-    from dmdtrl.scenarios import SCENARIO_REGISTRY
-
-    verified_models = verify_frozen_models(models_root, ppo_freeze)
-    training_seeds = design["ppo_training_seeds"]
-    policies = list(fixed_policies())
-    for training_seed in training_seeds:
-        policies.append(
-            load_ppo_policy(
-                verified_models[training_seed],
-                policy_name=ppo_policy_name(training_seed),
-            )
-        )
-    cpsat = RollingHorizonCPSATPolicy(
-        CPSATConfig(
-            max_jobs=int(cpsat_freeze["cpsat_horizon"]),
-            time_limit_s=float(cpsat_freeze["solver_seconds"]),
-        )
-    )
-
-    plans: list[tuple[str, list[int], Any]] = [
-        (
-            "nominal",
-            list(
-                range(
-                    int(design["nominal"]["seed_start"]),
-                    int(design["nominal"]["seed_start"])
-                    + int(design["nominal"]["seed_count"]),
-                )
-            ),
-            EnvConfig(),
-        )
-    ]
-    for scenario_name in design["stress"]["scenarios"]:
-        if scenario_name not in SCENARIO_REGISTRY:
-            raise ValueError(f"unknown frozen stress scenario: {scenario_name}")
-        plans.append(
-            (
-                scenario_name,
-                list(
-                    range(
-                        int(design["stress"]["seed_start"]),
-                        int(design["stress"]["seed_start"])
-                        + int(design["stress"]["seed_count"]),
-                    )
-                ),
-                SCENARIO_REGISTRY[scenario_name].apply(EnvConfig()),
-            )
-        )
-
-    raw_rows: list[dict[str, Any]] = []
-    summary_rows: list[dict[str, Any]] = []
-    dispersion_rows: list[dict[str, Any]] = []
-    primary_comparisons: list[dict[str, Any]] = []
-    per_model_comparisons: list[dict[str, Any]] = []
-
-    for scenario_index, (scenario, seeds, env_config) in enumerate(plans):
-        executable_rows = experiments.evaluate_policies(policies, seeds, env_config)
-        executable_rows.extend(evaluate_cpsat_policy(cpsat, seeds, env_config))
-        annotated = _annotate_policy_rows(
-            executable_rows,
-            scenario=scenario,
-            training_seeds=training_seeds,
-        )
-        aggregate_rows = average_ppo_by_environment_seed(
-            annotated,
-            training_seeds,
-            scenario=scenario,
-        )
-        scenario_rows = annotated + aggregate_rows
-        raw_rows.extend(scenario_rows)
-
-        summaries = experiments.summarize_runs(
-            scenario_rows,
-            n_bootstrap=int(design["bootstrap"]),
-            seed=70_000 + scenario_index * 10_000,
-        )
-        for summary in summaries:
-            summary_rows.append({"scenario": scenario, **summary})
-        dispersion_rows.append(
-            ppo_training_seed_dispersion(annotated, training_seeds, scenario=scenario)
-        )
-        primary, secondary = _scenario_comparisons(
-            scenario_rows,
-            training_seeds,
-            n_bootstrap=int(design["bootstrap"]),
-            n_permutations=int(design["permutations"]),
-            seed_offset=80_000 + scenario_index * 20_000,
-        )
-        primary_comparisons.extend(primary)
-        per_model_comparisons.extend(secondary)
-
-    apply_primary_holm(primary_comparisons)
-    return raw_rows, summary_rows, dispersion_rows, primary_comparisons, per_model_comparisons
-
-
 def build_manifest(
     design: dict[str, Any],
     ppo_freeze: dict[str, Any],
@@ -626,51 +503,3 @@ def build_manifest(
         },
         "no_final_test_tuning": True,
     }
-
-
-def main() -> None:  # pragma: no cover - exercised by GitHub Actions final campaign
-    parser = argparse.ArgumentParser(description="Run the frozen multi-controller final campaign.")
-    parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--ppo-freeze", type=Path, required=True)
-    parser.add_argument("--cpsat-freeze", type=Path, required=True)
-    parser.add_argument("--models-root", type=Path, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
-    args = parser.parse_args()
-
-    try:
-        ppo_freeze = read_json(args.ppo_freeze)
-        cpsat_freeze = read_json(args.cpsat_freeze)
-        design = validate_design(read_json(args.config), ppo_freeze, cpsat_freeze)
-        outputs = run_campaign(design, ppo_freeze, cpsat_freeze, args.models_root)
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-        parser.error(str(exc))
-
-    raw, summaries, dispersion, primary, per_model = outputs
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    write_csv(raw, args.output_dir / "final_runs.csv")
-    write_csv(summaries, args.output_dir / "final_policy_summary.csv")
-    write_csv(dispersion, args.output_dir / "ppo_training_seed_dispersion.csv")
-    write_csv(primary, args.output_dir / "primary_comparisons.csv")
-    write_csv(per_model, args.output_dir / "ppo_per_model_comparisons.csv")
-    (args.output_dir / "final_campaign_manifest.json").write_text(
-        json.dumps(build_manifest(design, ppo_freeze, cpsat_freeze), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-    print("Final weighted-tardiness leaders by scenario (descriptive only):")
-    for scenario in ["nominal", *design["stress"]["scenarios"]]:
-        candidates = [
-            row
-            for row in summaries
-            if row["scenario"] == scenario
-            and row["policy"] in {PPO_AGGREGATE_POLICY, "CP_SAT_RH", PRIMARY_FIXED_BASELINE}
-        ]
-        leader = min(candidates, key=lambda row: float(row["weighted_tardiness_mean"]))
-        print(
-            f"  {scenario:<20} {leader['policy']:<24} "
-            f"WTT={float(leader['weighted_tardiness_mean']):.3f}"
-        )
-
-
-if __name__ == "__main__":
-    main()
