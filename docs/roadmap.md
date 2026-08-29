@@ -100,7 +100,7 @@ Evidence:
 
 Status: **in progress.**
 
-The current validated v1.0 environment remains the locked dynamic heterogeneous parallel-machine model. Phase 5 is being built as a separate FJSP core so the Phase-4 result remains reproducible while the scheduling structure becomes materially richer.
+The current validated v1.0 environment remains the locked dynamic heterogeneous parallel-machine model. Phase 5 is a separate FJSP stack so the Phase-4 result remains reproducible while the scheduling structure becomes materially richer.
 
 Delivered in the first Phase-5 increment:
 
@@ -117,14 +117,26 @@ Delivered in the first Phase-5 increment:
 - deterministic shortest-processing and earliest-due-date feasibility baselines;
 - tests for precedence, eligibility, releases, setups, reproducibility, and full-instance completion.
 
+Delivered in the second Phase-5 increment:
+
+- Gymnasium-compatible FJSP decision environment;
+- fixed-capacity discrete action indexing over job × operation × machine slots;
+- exact Boolean dynamic feasibility mask derived from simulator state;
+- normalized global, per-job, routing, processing-time, and per-machine observation features;
+- infeasible-action rejection instead of silent repair;
+- action-trace logging with decision time, encoded action, job/operation/machine ids, feasible-action count, completion status, and reward;
+- incremental operation/job completion reward with waiting/setup/final weighted-tardiness penalties;
+- tests that the action mask exactly equals the simulator-feasible set.
+
 See `docs/fjsp_core.md`.
 
 Next Phase-5 increment:
 
-- Gymnasium-compatible FJSP decision environment;
-- fixed-capacity action indexing with an explicit dynamic feasibility mask;
-- action/rule-selection trace logging and policy-entropy diagnostics;
-- a Phase-5 seed partition separate from the locked Phase-4 final seeds.
+- strong FJSP rolling-horizon CP-SAT / interval-scheduling baseline;
+- explicit operation precedence and alternative-machine optional intervals;
+- sequence/setup treatment compatible with the FJSP simulator;
+- decision-latency and solver-reliability accounting;
+- a Phase-5 development/validation seed partition separate from locked Phase-4 seeds.
 
 Subsequent model upgrades:
 
@@ -134,10 +146,10 @@ Subsequent model upgrades:
 - explicit physical completion events and completion-timed reward/KPI accounting;
 - productive-utilization versus occupancy separation.
 
-Subsequent algorithm/baseline upgrades:
+Subsequent algorithm upgrades:
 
-- action-masked PPO for dynamic feasibility;
-- FJSP rolling-horizon CP-SAT / interval scheduling;
+- `sb3-contrib` Maskable PPO after the strong FJSP OR comparator exists;
+- action-trace / policy-entropy diagnostics against deterministic and OR baselines;
 - strong neighborhood-search or ALNS-style baselines;
 - graph/attention state encoders only if the FJSP structure warrants them.
 
