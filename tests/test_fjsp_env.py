@@ -52,7 +52,6 @@ def test_mask_preserves_precedence_and_trace_records_decision() -> None:
     mask = env.action_masks()
     action_id = int(np.flatnonzero(mask)[0])
     action = env.codec.decode(action_id)
-    job = env.simulator.job(action.job_id)
     assert action.operation_index == 0
 
     observation, reward, terminated, truncated, info = env.step(action_id)
