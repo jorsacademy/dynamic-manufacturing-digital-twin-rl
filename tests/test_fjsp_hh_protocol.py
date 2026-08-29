@@ -1,23 +1,17 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pathlib import Path
 
 import pytest
 
-from dmdtrl.fjsp_hh_protocol import (
-    load_hh_validation_design,
-    validate_hh_validation_design,
-)
+from dmdtrl import fjsp_hh_protocol
 from dmdtrl.fjsp_operators import OPERATOR_NAMES
 
-
-
-DESIGN_PATH = Path("configs/fjsp_hh_validation_design.json")
+DESIGN_PATH = "configs/fjsp_hh_validation_design.json"
 
 
 def _design() -> dict:
-    return load_hh_validation_design(DESIGN_PATH)
+    return fjsp_hh_protocol.load_hh_validation_design(DESIGN_PATH)
 
 
 def test_committed_design_is_valid_and_predeclared() -> None:
@@ -61,28 +55,28 @@ def test_protocol_rejects_post_hoc_or_boundary_changes(
         target = target[key]
     target[path[-1]] = value
     with pytest.raises(ValueError, match=message):
-        validate_hh_validation_design(design)
+        fjsp_hh_protocol.validate_hh_validation_design(design)
 
 
 def test_protocol_rejects_reversed_or_noninteger_seed_ranges() -> None:
     design = deepcopy(_design())
     design["development_seed_start"] = 41_000
     with pytest.raises(ValueError, match="reversed|overlap"):
-        validate_hh_validation_design(design)
+        fjsp_hh_protocol.validate_hh_validation_design(design)
 
     design = deepcopy(_design())
     design["validation_seed_start"] = "41200"
     with pytest.raises(ValueError, match="integer"):
-        validate_hh_validation_design(design)
+        fjsp_hh_protocol.validate_hh_validation_design(design)
 
 
 def test_protocol_requires_five_nonnegative_training_seeds() -> None:
     design = deepcopy(_design())
     design["training_seeds"] = [901, 1901]
     with pytest.raises(ValueError, match="five"):
-        validate_hh_validation_design(design)
+        fjsp_hh_protocol.validate_hh_validation_design(design)
 
     design = deepcopy(_design())
     design["training_seeds"] = [901, 1901, 2901, 3901, -1]
     with pytest.raises(ValueError, match="non-negative"):
-        validate_hh_validation_design(design)
+        fjsp_hh_protocol.validate_hh_validation_design(design)
