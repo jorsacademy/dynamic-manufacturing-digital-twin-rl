@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from dmdtrl.fjsp_generator import FJSPGeneratorConfig, generate_fjsp_instance
+from dmdtrl.fjsp_models import FJSPAction, FJSPInstance, FJSPJob, FJSPMachineOption, FJSPOperation
 from dmdtrl.fjsp_optimization import FJSPCPSATConfig, FJSPRollingHorizonCPSAT
 from dmdtrl.fjsp_or_benchmark import FJSPBenchmarkConfig, run_benchmark, summarize_benchmark
 from dmdtrl.fjsp_simulator import FlexibleJobShopSimulator
@@ -47,6 +48,39 @@ def test_candidate_horizon_never_uses_unreleased_jobs() -> None:
     assert 1 <= len(candidates) <= 2
     assert all(job.release_time <= simulator.current_time + 1e-12 for job in candidates)
     assert all(simulator.next_operation[job.job_id] < len(job.operations) for job in candidates)
+
+
+def test_candidate_horizon_keeps_currently_executable_job() -> None:
+    job0 = FJSPJob(
+        job_id=0,
+        release_time=0.0,
+        due_date=5.0,
+        priority=3,
+        family=0,
+        operations=(
+            FJSPOperation(0, 0, (FJSPMachineOption(0, 10.0),)),
+            FJSPOperation(0, 1, (FJSPMachineOption(0, 1.0),)),
+        ),
+    )
+    job1 = FJSPJob(
+        job_id=1,
+        release_time=0.0,
+        due_date=100.0,
+        priority=1,
+        family=1,
+        operations=(FJSPOperation(1, 0, (FJSPMachineOption(1, 1.0),)),),
+    )
+    simulator = FlexibleJobShopSimulator(FJSPInstance((job0, job1), n_machines=2))
+    simulator.step(FJSPAction(0, 0, 0))
+    assert simulator.current_time == pytest.approx(0.0)
+    eligible = simulator.eligible_actions()
+    assert eligible == (FJSPAction(1, 0, 1),)
+
+    controller = FJSPRollingHorizonCPSAT(FJSPCPSATConfig(job_horizon=1, solver_seconds=0.2))
+    candidates = controller._candidate_jobs(simulator, eligible)
+    assert tuple(job.job_id for job in candidates) == (1,)
+    decision = controller.choose(simulator)
+    assert decision.action == FJSPAction(1, 0, 1)
 
 
 def test_cpsat_returns_feasible_actions_and_completes_instance() -> None:
