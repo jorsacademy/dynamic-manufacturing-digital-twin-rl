@@ -84,7 +84,7 @@ def validate_hh_validation_design(design: dict[str, Any]) -> None:
     for (_, _, left_end), (right_name, right_start, _) in zip(
         ranges,
         ranges[1:],
-        strict=True,
+        strict=False,
     ):
         if left_end >= right_start:
             raise ValueError(f"seed ranges overlap before {right_name}")
