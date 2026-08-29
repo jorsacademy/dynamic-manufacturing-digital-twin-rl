@@ -17,7 +17,7 @@ def load_named_ppo_policy(model_path: Path, training_seed: int):
     return policy
 
 
-def run_frozen_campaign(
+def run_frozen_campaign(  # pragma: no cover - exercised by final workflow integration
     design: dict[str, Any],
     ppo_freeze: dict[str, Any],
     cpsat_freeze: dict[str, Any],
@@ -127,7 +127,7 @@ def run_frozen_campaign(
     return raw_rows, summary_rows, dispersion_rows, primary_comparisons, per_model_comparisons
 
 
-def write_outputs(
+def write_outputs(  # pragma: no cover - exercised by final workflow integration
     outputs: tuple[
         list[dict[str, Any]],
         list[dict[str, Any]],
