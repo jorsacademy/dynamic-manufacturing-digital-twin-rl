@@ -4,11 +4,11 @@
 
 Phase 4 showed that the PPO hyper-heuristic did not add robust value over the strongest fixed dispatching rule in the dynamic parallel-machine formulation. Phase 5 therefore changes the scheduling problem structure instead of tuning PPO against locked final-test seeds.
 
-This first Phase-5 increment introduces a separate true flexible job-shop (FJSP) core while preserving the validated v1.0 parallel-machine experiment unchanged.
+Phase 5 is implemented as a separate true flexible job-shop (FJSP) stack so the validated v1.0 parallel-machine experiment remains reproducible and frozen.
 
-## Implemented structure
+## Implemented FJSP structure
 
-The FJSP model now supports:
+The FJSP model supports:
 
 - jobs with multiple ordered operations;
 - strict operation precedence;
@@ -46,32 +46,71 @@ Due dates are based on the sum of the fastest eligible processing option for eac
 
 ## Deterministic baselines
 
-The first core includes two feasibility-preserving direct assignment selectors:
+The FJSP core currently includes two feasibility-preserving direct assignment selectors:
 
 - shortest setup-plus-processing action;
 - earliest-due-date action with processing-time tie breaking.
 
-These are scaffolding baselines, not the final strong comparison set. Later Phase-5 increments should add FJSP rolling-horizon CP-SAT / interval scheduling and neighborhood-search baselines before any RL performance claim.
+These are scaffolding baselines, not the final strong comparison set. Later Phase-5 increments will add FJSP rolling-horizon CP-SAT / interval scheduling and neighborhood-search baselines before any RL performance claim.
 
-## Deliberate exclusions from this increment
+## Gymnasium environment and action mask
 
-Not yet included:
+`FlexibleJobShopEnv` wraps the event-driven FJSP simulator in a fixed-capacity Gymnasium interface.
 
-- breakdowns or stochastic repairs;
-- urgent-order burst process;
-- pre-generated exogenous disruption plans;
-- Gymnasium observation/action interface;
-- action masking / Maskable PPO;
-- GNN or attention encoder;
-- FJSP CP-SAT benchmark;
-- physical completion-event queue separate from schedule commitment;
-- RL training.
+The action space is a deterministic index over all capacity slots:
 
-These are intentionally deferred until the core precedence/routing semantics are tested and stable.
+`job slot × operation slot × machine`.
+
+The environment exposes `action_masks()`, a Boolean vector with one entry per discrete action. An action is true only when the corresponding `(job, operation, machine)` tuple is currently precedence-feasible, released, machine-eligible, and resource-available.
+
+This separates two concerns:
+
+- the Gymnasium action space remains fixed across an experiment;
+- the feasible action set remains dynamic and exact.
+
+Invalid unmasked actions are rejected rather than silently repaired. A future Maskable PPO integration will consume the same mask so the learned policy never trains on impossible assignments.
+
+### Observation structure
+
+The current fixed-size observation contains:
+
+- global time/progress/utilization/slack/overdue features;
+- per-job release/completion/progress/priority/family/slack/readiness features;
+- per-job next-operation eligible-machine indicators;
+- per-job next-operation machine-dependent normalized processing times;
+- per-machine availability, time-to-available, previous family, busy load, and setup load.
+
+All features are normalized/clipped to `[0, 1]`. This vector representation is intentionally explicit and auditable. Graph/attention encoders are deferred until a strong vector baseline exists.
+
+### Action trace
+
+Every executed decision records:
+
+- decision index and simulated decision time;
+- encoded action id;
+- job, operation, and machine ids;
+- feasible-action count at the decision epoch;
+- whether the operation completed the job;
+- scheduled completion time;
+- immediate reward.
+
+This directly addresses the Phase-4 diagnostic gap where some PPO models were outcome-equivalent to deterministic heuristics but action traces were unavailable.
+
+## Reward contract
+
+The initial FJSP reward is operational and incremental:
+
+- small operation-completion bonus;
+- additional final-job completion bonus;
+- operation waiting penalty;
+- sequence setup penalty;
+- priority-weighted tardiness penalty applied when the final operation is scheduled.
+
+This reward is not frozen for scientific comparison yet. It remains a development parameter until strong FJSP OR/search baselines and Phase-5 validation partitions are established.
 
 ## Testing contract
 
-The initial tests verify:
+The tests verify:
 
 - invalid precedence chains are rejected;
 - duplicate machine alternatives are rejected;
@@ -80,10 +119,27 @@ The initial tests verify:
 - machine eligibility is enforced;
 - release times and event advancement work;
 - sequence setup time is applied between product families;
-- a deterministic greedy policy can complete a generated multi-operation FJSP instance.
+- a deterministic greedy policy can complete a generated multi-operation FJSP instance;
+- action codec encode/decode is stable;
+- the Boolean mask exactly matches simulator-feasible actions;
+- precedence remains enforced after a masked step;
+- infeasible discrete actions are rejected;
+- action-trace records preserve the executed decision contract.
+
+## Deliberate exclusions at this stage
+
+Not yet included:
+
+- breakdowns or stochastic repairs in the FJSP stack;
+- urgent-order burst process;
+- pre-generated exogenous disruption plans;
+- `sb3-contrib` / Maskable PPO training;
+- GNN or attention encoder;
+- FJSP CP-SAT benchmark;
+- physical completion-event queue separate from schedule commitment.
 
 ## Next Phase-5 increment
 
-The next increment should add a Gymnasium-compatible FJSP decision environment with a fixed-capacity action index and explicit feasibility mask, plus action-trace logging. That environment will be designed for Maskable PPO without allowing invalid job-operation-machine assignments.
+The next increment should add the first strong FJSP optimization baseline: rolling-horizon CP-SAT with operation precedence, alternative-machine intervals, and sequence/setup logic. That baseline should be validated before Maskable PPO is trained so RL is not developed without a credible OR comparator.
 
 The Phase-4 final seeds remain locked and are not reused for Phase-5 model selection.
