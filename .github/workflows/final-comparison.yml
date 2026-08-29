@@ -1,5 +1,6 @@
 name: Final Comparative Campaign
 
+# Operational trigger commit only; frozen experiment design is unchanged.
 on:
   workflow_dispatch:
   push:
